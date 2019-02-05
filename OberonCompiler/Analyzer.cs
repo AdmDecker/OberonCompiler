@@ -14,7 +14,9 @@ namespace OberonCompiler
         stringt, errort
     }
 
-    enum CharTypes { alpha, numerical, period, relational, math, unknown, eof, quote }
+    enum CharTypes { alpha, numerical, period, relational, math, unknown, eof, quote,
+        whitespace
+    }
 
     class Analyzer
     {
@@ -70,7 +72,7 @@ namespace OberonCompiler
             switch (t)
             {
                 case CharTypes.alpha:
-                    s = processWord();
+                    s = processWord(); 
                     break;
                 case CharTypes.numerical:
                     s = processNumber();
@@ -83,12 +85,11 @@ namespace OberonCompiler
                     s = processString();
                     fetchChars();
                     break;
-                case CharTypes.match:
-                    s = processMath();
+                case CharTypes.whitespace:
+                    s = getNextToken();
                     break;
                 default: s = 
                     processOther();
-                    fetchChars();
                     break;
             }
 
@@ -99,8 +100,8 @@ namespace OberonCompiler
         {
             var lexeme = fetchWhile((i) =>
             {
-                return (Char.IsLetterOrDigit(i));
-            });
+                return Char.IsLetterOrDigit(i);
+            }, 17);
 
             if (reservedWords.ContainsKey(lexeme))
             {
@@ -155,9 +156,14 @@ namespace OberonCompiler
         protected Symbol processOther()
         {
             char[] symbols = new char[] { '(', ')', '{', '}', '[', ']', ',', ';', ':', '.', '`', '~' };
-            char[] mulops = new char[] { ''}
+            char[] mulops = new char[] { '*', '/', '&' };
+            char[] addops = new char[] { '+', '-' };
 
             var lexeme = curChar.ToString();
+
+            if (curChar == '.' && Char.IsDigit(nextChar))
+                return processNumber();
+
 
             if (curChar == '(' && nextChar == '*')
             {
@@ -166,13 +172,22 @@ namespace OberonCompiler
                 return getNextToken();
             }
 
-            if (symbols.Contains(curChar))
-                return new Symbol(Tokens.symbolt, lineNumber, lexeme);
-
             if (curChar == -1)
                 return new Symbol(Tokens.eoft, lineNumber, lexeme);
 
-            return new Symbol(Tokens.unknownt, lineNumber, lexeme);
+            Tokens t;
+
+            if (symbols.Contains(curChar))
+                t = Tokens.symbolt;
+            else if (mulops.Contains(curChar))
+                t = Tokens.mulopt;
+            else if (addops.Contains(curChar))
+                t = Tokens.addopt;
+            else
+                t = Tokens.unknownt;
+
+            fetchChars();
+            return new Symbol(t, lineNumber, lexeme);
         }
 
         protected Symbol processString()
@@ -214,13 +229,14 @@ namespace OberonCompiler
             }
         }
 
-        protected string fetchWhile(Matches expression)
+        protected string fetchWhile(Matches expression, int charLimit = -1)
         {
             var ret = new StringBuilder();
-            while(expression(curChar) && !eof)
+            while(expression(curChar) && !eof && charLimit != 0)
             {
                 ret.Append(curChar);
                 fetchChars();
+                charLimit--;
             }
             return ret.ToString();
         }
@@ -237,6 +253,8 @@ namespace OberonCompiler
                 return CharTypes.relational;
             if (c == '\'' || c == '"')
                 return CharTypes.quote;
+            if (Char.IsWhiteSpace(c))
+                return CharTypes.whitespace;
 
             else return CharTypes.unknown;
         }
