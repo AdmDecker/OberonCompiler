@@ -1,0 +1,32 @@
+﻿Start -> Prog
+Prog -> modulet idt ; DeclarativePart StatementPart endt idt .
+DeclarativePart -> ConstPart VarPart ProcPart
+ConstPart -> constt ConstTail
+ConstPart -> emptyt
+ConstTail -> idt = Value ; ConstTail
+ConstTail -> emptyt
+VarPart -> vart VarTail
+VarPart -> emptyt
+VarTail -> IdentifierList : TypeMark ; VarTail
+VarTail -> emptyt
+IdentifierList -> idt
+IdentifierList -> IdentifierList , idt
+TypeMark -> integert
+TypeMark -> realt
+TypeMark -> chart
+Value -> NumericalLiteral
+ProcPart -> ProcedureDecl ProcPart
+ProcPart -> emptyt
+ProcedureDecl -> ProcHeading ; ProcBody idt ;
+ProcHeading -> proct idt Args
+ProcBody -> DeclarativePart StatementPart endt
+Args -> ( ArgList )
+Args -> emptyt
+ArgList -> Mode IdentifierList : TypeMark MoreArgs
+MoreArgs -> ; ArgList
+MoreArgs -> emptyt
+Mode -> vart
+Mode -> emptyt
+StatementPart -> begint SeqOfStatements
+StatementPart -> emptyt
+SeqOfStatements -> emptyt
