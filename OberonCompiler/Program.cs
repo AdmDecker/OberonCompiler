@@ -18,12 +18,8 @@ namespace OberonCompiler
             else
             {
                 var analyzer = new Analyzer(args[0]);
-                Symbol token;
-                do
-                {
-                    token = analyzer.getNextToken();
-                    Console.WriteLine(token.ToString());
-                } while (token.token != Tokens.eoft);
+                var parser = new Parser();
+                parser.Goal(analyzer);
             }
 
             Console.WriteLine("Press Enter to exit");
