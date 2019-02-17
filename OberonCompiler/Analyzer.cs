@@ -11,7 +11,8 @@ namespace OberonCompiler
     enum Tokens {
         modulet, proceduret, vart, begint, endt, ift, thent, elset, elseift, whilet, dot, arrayt,
         recordt, constt, typet, idt, addopt, mulopt, numt, relopt, assignopt, symbolt, unknownt, eoft,
-        stringt, errort
+        stringt, errort, emptyt, commat, semicolont, colont, periodt, equalt, lparent, rparent, integert,
+        realt, chart
     }
 
     enum CharTypes { alpha, numerical, period, relational, math, unknown, eof, quote,
@@ -26,7 +27,7 @@ namespace OberonCompiler
         private int filePointer = 0;
         private char curChar = ' ';
         private char nextChar = ' ';
-        private int lineNumber = 0;
+        private int lineNumber = 1;
         private bool eof = false;
 
         public Analyzer(String fileName)
@@ -139,31 +140,34 @@ namespace OberonCompiler
 
         protected Symbol processRelOp()
         {
-        
+
             if (curChar != '=' && curChar != '#' && nextChar == '=')
             {
                 var lexeme = curChar.ToString() + nextChar.ToString();
                 fetchChars(2);
 
                 Tokens token = curChar == ':' ? Tokens.assignopt : Tokens.relopt;
-                
+
                 return new Symbol(token, lineNumber, lexeme);
             }
+            else if (curChar == '=')
+                return new Symbol(Tokens.equalt, lineNumber, curChar.ToString());
+            else if (curChar == ':')
+                return new Symbol(Tokens.colont, lineNumber, curChar.ToString());
 
             return new Symbol(Tokens.relopt, lineNumber, curChar.ToString());   
         }
 
         protected Symbol processOther()
         {
-            char[] symbols = new char[] { '(', ')', '{', '}', '[', ']', ',', ';', ':', '.', '`', '~' };
+            char[] symbols = new char[] { '{', '}', '[', ']', '`', '~' };
             char[] mulops = new char[] { '*', '/', '&' };
             char[] addops = new char[] { '+', '-' };
 
             var lexeme = curChar.ToString();
 
-            if (curChar == '.' && Char.IsDigit(nextChar))
+            if (curChar == '.' && char.IsDigit(nextChar))
                 return processNumber();
-
 
             if (curChar == '(' && nextChar == '*')
             {
@@ -183,6 +187,18 @@ namespace OberonCompiler
                 t = Tokens.mulopt;
             else if (addops.Contains(curChar))
                 t = Tokens.addopt;
+            else if (curChar == ';')
+                t = Tokens.semicolont;
+            else if (curChar == '.')
+                t = Tokens.periodt;
+            else if (curChar == ':')
+                t = Tokens.colont;
+            else if (curChar == ',')
+                t = Tokens.commat;
+            else if (curChar == '(')
+                t = Tokens.lparent;
+            else if (curChar == ')')
+                t = Tokens.rparent;
             else
                 t = Tokens.unknownt;
 
@@ -280,6 +296,9 @@ namespace OberonCompiler
             { "DIV", Tokens.mulopt },
             { "AND", Tokens.addopt },
             { "MOD", Tokens.mulopt },
+            { "INTEGER", Tokens.integert },
+            { "REAL", Tokens.realt },
+            { "CHAR", Tokens.chart }
         };
 }
 

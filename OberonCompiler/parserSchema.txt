@@ -1,29 +1,30 @@
 ﻿Start -> Prog
-Prog -> modulet idt ; DeclarativePart StatementPart endt idt .
+Prog -> modulet idt semicolont DeclarativePart StatementPart endt idt periodt
 DeclarativePart -> ConstPart VarPart ProcPart
 ConstPart -> constt ConstTail
 ConstPart -> emptyt
-ConstTail -> idt = Value ; ConstTail
+ConstTail -> idt equalt Value semicolont ConstTail
 ConstTail -> emptyt
 VarPart -> vart VarTail
 VarPart -> emptyt
-VarTail -> IdentifierList : TypeMark ; VarTail
+VarTail -> IdentifierList colont TypeMark semicolont VarTail
 VarTail -> emptyt
-IdentifierList -> idt
-IdentifierList -> IdentifierList , idt
+IdentifierList -> idt IdentifierList'
+IdentifierList' -> commat idt IdentifierList'
+IdentifierList' -> emptyt
 TypeMark -> integert
 TypeMark -> realt
 TypeMark -> chart
-Value -> NumericalLiteral
+Value -> numt
 ProcPart -> ProcedureDecl ProcPart
 ProcPart -> emptyt
-ProcedureDecl -> ProcHeading ; ProcBody idt ;
-ProcHeading -> proct idt Args
+ProcedureDecl -> ProcHeading semicolont ProcBody idt semicolont
+ProcHeading -> proceduret idt Args
 ProcBody -> DeclarativePart StatementPart endt
-Args -> ( ArgList )
+Args -> lparent ArgList rparent
 Args -> emptyt
-ArgList -> Mode IdentifierList : TypeMark MoreArgs
-MoreArgs -> ; ArgList
+ArgList -> Mode IdentifierList colont TypeMark MoreArgs
+MoreArgs -> semicolont ArgList
 MoreArgs -> emptyt
 Mode -> vart
 Mode -> emptyt

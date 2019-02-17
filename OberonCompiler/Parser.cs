@@ -15,6 +15,12 @@ namespace OberonCompiler
         Symbol currentToken;
         Symbol nextToken;
 
+        private void CycleTokens()
+        {
+            currentToken = nextToken;
+            nextToken = analyzer.getNextToken();
+        }
+
         public bool Goal(Analyzer analyzer)
         {
             this.analyzer = analyzer;
@@ -25,12 +31,76 @@ namespace OberonCompiler
 
             processGrammarRule("Start");
 
+            if (currentToken.token != Tokens.eoft)
+                Console.WriteLine("Parse error: Unexpected symbol {0} of token class '{2}' on line {1}",
+                    currentToken.lexeme, currentToken.lineNumber, currentToken.token);
+            else
+                Console.WriteLine("Parse complete. PROGRAM VALID");
             return true;
         }
 
-        protected void processGrammarRule(string variable)
+        protected bool processGrammarRule(string variable)
         {
-            
+            var productions = parserTable.grammarRules[variable].productions;
+            var matchingProductions = new List<List<string>>();
+            var nonMatchingProductions = new List<List<string>>();
+            bool emptyProduction = false;
+
+            //Do matching productions first
+            foreach(var production in productions)
+            {
+                var firstToken = MapStringToToken(production[0]);
+                if (firstToken == currentToken.token)
+                    matchingProductions.Add(production);
+                else if (production.Count == 1 && firstToken == Tokens.emptyt)
+                    emptyProduction = true;
+                else
+                    nonMatchingProductions.Add(production);
+            }
+
+            foreach( var production in matchingProductions)
+            {
+                if (processProduction(production))
+                    return true;
+            }
+
+            foreach (var production in nonMatchingProductions)
+            {
+                if (processProduction(production))
+                    return true;
+            }
+
+            //Do empty productions last
+            if (emptyProduction)
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        protected bool processProduction(List<string> production)
+        {
+            foreach(string token in production)
+            {
+                //Process Variable
+                if (char.IsUpper(token[0]))
+                {
+                    if (!processGrammarRule(token))
+                        return false;
+                }
+                //Process Token
+                else
+                {
+                    if (MapStringToToken(token) != currentToken.token)
+                    {
+                        return false;
+                    }
+
+                    CycleTokens();
+                }
+            }
+            return true;
         }
 
         protected bool buildParserTableFromSchema()
@@ -51,36 +121,38 @@ namespace OberonCompiler
             {
                 var lineNumber = item.i;
                 var line = item.value;
+                if (string.IsNullOrWhiteSpace(line) || string.IsNullOrEmpty(line))
+                    continue;
 
                 try
                 {
                     var words = line.Split(' ').Where((string i) =>
                     {
-                        return !String.IsNullOrWhiteSpace(i);
+                        return !(string.IsNullOrWhiteSpace(i) || string.IsNullOrEmpty(i));
                     }).ToList();
                     var productionVariable = words[0];
                     List<string> productionSentence;
 
                     if (words[1] != "->")
-                        throw new Exception("'->' Operator missing or misplaced");
+                        throw new ParserException("'->' Operator missing or misplaced");
                     if (words.Count - 2 <= 0)
-                        throw new Exception("Incomplete or malformed grammar");
+                        throw new ParserException("Incomplete or malformed grammar");
 
                     productionSentence = words.Skip(2).ToList();
 
                     //Verify grammar is not left-recursive
                     if (words[0] == productionSentence[0])
-                        throw new Exception(string.Format("Schema error in production '{0}' - left recursive productions are FORBIDDEN", line));
+                        throw new ParserException(string.Format("Schema error in production '{0}' - left recursive productions are FORBIDDEN", line));
 
-                    //verify production
-                    foreach( string token in productionSentence)
+                    ////verify production
+                    foreach (string token in productionSentence)
                     {
                         // Verify tokens are valid
                         if (!Char.IsUpper(token[0]))
                         {
                             if (MapStringToToken(token) == Tokens.unknownt)
                             {
-                                throw new Exception(String.Format("Unknown token '{0}' in production '{1}'", token,
+                                throw new ParserException(String.Format("Unknown token '{0}' in production '{1}'", token,
                                     line));
                             }
                         }
@@ -89,7 +161,7 @@ namespace OberonCompiler
                     //Add production to dictionary
                     parserTable.Add(words[0],productionSentence);
                 }
-                catch (Exception e)
+                catch (ParserException e)
                 {
                     Console.WriteLine("Error in parser: Schema error on line {0} - Invalid Syntax - {1}", lineNumber.ToString(), e.Message);
                     return false;
@@ -115,7 +187,8 @@ namespace OberonCompiler
                         {
                             if (!parserTable.grammarRules.ContainsKey(token))
                             {
-                                Console.WriteLine("Error in parser: Schema error in production '{0}' - Unknown Variable reference '{1}'", token, sentence);
+                                Console.WriteLine("Error in parser: Schema error in production '{0}' - Unknown Variable reference '{1}'", 
+                                    item.Key + " -> " + string.Join(" ", sentence), token );
                                 hasError = true;
                             }
                         }
@@ -134,7 +207,6 @@ namespace OberonCompiler
             {
                 return Tokens.unknownt;
             }
-            
         }
     }
 
@@ -152,11 +224,18 @@ namespace OberonCompiler
 
     class Productions
     {
-        public List<List<string>> productions;
+        public List<List<string>> productions = new List<List<string>>();
 
         public void Add(List<string> production)
         {
             productions.Add(production);
+        }
+    }
+
+    class ParserException : Exception
+    {
+        public ParserException(string message) : base(message)
+        {
         }
     }
 }

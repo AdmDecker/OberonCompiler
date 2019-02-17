@@ -43,7 +43,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Analyzer.cs" />
-    <Compile Include="ErrorLog.cs" />
     <Compile Include="Parser.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -55,4 +54,7 @@
     <Content Include="parserSchema.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PreBuildEvent>copy $(ProjectDir)parserSchema.txt $(TargetDir)</PreBuildEvent>
+  </PropertyGroup>
 </Project>
