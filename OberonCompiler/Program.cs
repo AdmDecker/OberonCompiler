@@ -17,16 +17,25 @@ namespace OberonCompiler
             }
             else
             {
+                Record rec = null;
                 var analyzer = new Analyzer(args[0]);
+                var symTable = new SymTable();
                 Symbol token;
-                do
+                int depth = 0;
+                while((token = analyzer.getNextToken()).token != Tokens.eoft)
                 {
-                    token = analyzer.getNextToken();
-                    Console.WriteLine(token.ToString());
-                } while (token.token != Tokens.eoft);
+
+                    symTable.Insert(token.lexeme, token, depth);
+                    if (token.token == Tokens.proceduret)
+                    {
+                        depth++;
+                        rec = symTable.Lookup(token.lexeme);
+                    }
+
+                }
+                symTable.WriteTable(0);
             }
 
-            Console.WriteLine("Press Enter to exit");
             Console.ReadLine();
         }
     }
