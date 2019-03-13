@@ -10,20 +10,32 @@ namespace OberonCompiler
     {
         static void Main(string[] args)
         {
-            //if (args.Length != 1)
-            //{
-            //    Console.WriteLine(String.Format("Usage: {0} filename",
-            //        System.AppDomain.CurrentDomain.FriendlyName));
-            //}
-            //else
-            //{
-            //    var analyzer = new Analyzer(args[0]);
-            //    var parser = new Parser();
-            //    parser.Goal(analyzer);
-            //}
+            if (args.Length != 1)
+            {
+                Console.WriteLine(String.Format("Usage: {0} filename",
+                    System.AppDomain.CurrentDomain.FriendlyName));
+            }
+            else
+            {
+                Record rec = null;
+                var analyzer = new Analyzer(args[0]);
+                var symTable = new SymTable();
+                Symbol token;
+                int depth = 0;
+                while((token = analyzer.getNextToken()).token != Tokens.eoft)
+                {
 
-            var symtable = new SymTable();
-            symtable.Insert("", new Symbol(Tokens.addopt, 15), 15);
+                    symTable.Insert(token.lexeme, token, depth);
+                    if (token.token == Tokens.proceduret)
+                    {
+                        depth++;
+                        rec = symTable.Lookup(token.lexeme);
+                    }
+
+                }
+                symTable.WriteTable(0);
+            }
+
             Console.ReadLine();
         }
     }
