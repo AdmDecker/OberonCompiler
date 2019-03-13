@@ -10,19 +10,20 @@ namespace OberonCompiler
     {
         static void Main(string[] args)
         {
-            if (args.Length != 1)
-            {
-                Console.WriteLine(String.Format("Usage: {0} filename",
-                    System.AppDomain.CurrentDomain.FriendlyName));
-            }
-            else
-            {
-                var analyzer = new Analyzer(args[0]);
-                var parser = new Parser();
-                parser.Goal(analyzer);
-            }
+            //if (args.Length != 1)
+            //{
+            //    Console.WriteLine(String.Format("Usage: {0} filename",
+            //        System.AppDomain.CurrentDomain.FriendlyName));
+            //}
+            //else
+            //{
+            //    var analyzer = new Analyzer(args[0]);
+            //    var parser = new Parser();
+            //    parser.Goal(analyzer);
+            //}
 
-            Console.WriteLine("Press Enter to exit");
+            var symtable = new SymTable();
+            symtable.Insert("", new Symbol(Tokens.addopt, 15), 15);
             Console.ReadLine();
         }
     }
