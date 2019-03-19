@@ -10,6 +10,7 @@ namespace OberonCompiler
     class Parser
     {
         const string schemaPath = "parserSchema.txt";
+        IParserHooks parseEngine;
         ParserTable parserTable = new ParserTable();
         Analyzer analyzer;
         Symbol currentToken;
@@ -21,7 +22,7 @@ namespace OberonCompiler
             nextToken = analyzer.getNextToken();
         }
 
-        public bool Goal(Analyzer analyzer)
+        public bool Goal(Analyzer analyzer, IParserHooks parseEngine)
         {
             this.analyzer = analyzer;
             currentToken = analyzer.getNextToken();
@@ -87,7 +88,11 @@ namespace OberonCompiler
                 if (char.IsUpper(token[0]))
                 {
                     if (!processGrammarRule(token))
+                    {
+                        parseEngine.cancelVariable(token);
                         return false;
+                    }
+                        
                 }
                 //Process Token
                 else
@@ -96,7 +101,7 @@ namespace OberonCompiler
                     {
                         return false;
                     }
-
+                    parseEngine.writeToken(token);
                     CycleTokens();
                 }
             }

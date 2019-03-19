@@ -6,15 +6,13 @@ using System.Threading.Tasks;
 
 namespace OberonCompiler
 {
-    
-
     class SymTable
     {
         const int tableSize = 211;
         Record[] table = new Record[tableSize];
 
         //Insert(lex, token, depth) - insert the lexeme, token and depth into a record in the symbol table.
-        public void Insert(string lex, Symbol token, int depth)
+        public Record Insert(string lex, Symbol token, int depth)
         {
             Record newRecord = new Record(token, depth);
 
@@ -28,6 +26,8 @@ namespace OberonCompiler
                 newRecord.nextNode = table[hash];
                 table[hash] = newRecord;
             }
+
+            return newRecord;
         }
 
         //Lookup(lex) - lookup uses the lexeme to find the entry and returns a pointer to that entry.
@@ -118,8 +118,6 @@ namespace OberonCompiler
         }
     }
 
-    
-
     enum RecordTypes
     {
         VARIABLE,
@@ -156,7 +154,21 @@ namespace OberonCompiler
         intType,
         floatType,
     }
+
+    enum ConstTypes
+    {
+        intType,
+        realType,
+    }
+
     class VariableRecord {
+        public VariableRecord(VarTypes type, int offset, int size)
+        {
+            this.type = type;
+            this.offset = offset;
+            this.size = size;
+        }
+
         public VarTypes type;
         public int offset;
         public int size;
@@ -164,17 +176,48 @@ namespace OberonCompiler
 
     class ConstantRecord
     {
-        public VarTypes type;
-        public int offset;
-        public int value;
-        public float valueR;
+        public ConstantRecord(Symbol s)
+        {
+            if (s.value != null)
+            {
+                this.type = ConstTypes.intType;
+                value = s.value;
+            }
+            else if (s.valueR != null)
+            {
+                this.type = ConstTypes.realType;
+                valueR = s.valueR;
+            }
+        }
+        public ConstTypes type;
+        public int? value;
+        public double? valueR;
     }
 
     class ProcedureRecord
     {
         public VarTypes returnType;
-        public int sizeOfLocal;
-        public int numberOfParameters;
+        public int sizeOfLocal = 0;
+        public int sizeOfParameters = 0;
+
+        public int numberOfParameters = 0;
+
+        public void AddParameter(VariableRecord rec, bool modeIsVar)
+        {
+            var p = new Parameter(rec.type, modeIsVar);
+            if (parameters == null)
+                parameters = p;
+            else
+                parameters.Add(p);
+
+            this.sizeOfParameters += rec.size;
+            this.numberOfParameters++;
+        }
+
+        public void AddLocal(VariableRecord rec)
+        {
+            this.sizeOfLocal += rec.size;
+        }
 
         //Linked list of parameters
         public Parameter parameters;
@@ -182,7 +225,23 @@ namespace OberonCompiler
 
     class Parameter
     {
-        public VarTypes paramType;
+        public Parameter(VarTypes type, bool modeIsVar)
+        {
+            this.type = type;
+            this.modeIsVar = modeIsVar;
+        }
+        VarTypes type;
+        bool modeIsVar;
+
+        public void Add(Parameter param)
+        {
+            if (this.nextParameter == null)
+            {
+                nextParameter = param;
+            }
+            else
+                nextParameter.Add(param);
+        }
         public Parameter nextParameter;
     }
 }
