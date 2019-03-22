@@ -15,16 +15,44 @@ namespace OberonCompiler
         public void Goal(Analyzer a)
         {
             this.a = a;
+            this.nt = a.getNextToken();
             Prog();
+            Match(Tokens.eoft);
         }
 
         public void Match(params Tokens[] t)
         {
+            CycleTokens();
+            bool success = false;
+            foreach( Tokens b in t)
+            {
+                if (ct.token == b)
+                    success = true;
+            }
 
+            if (!success)
+            {
+                string s = "";
+                foreach(Tokens f in t)
+                {
+                    s += f.ToString();
+                }
+                Console.WriteLine(
+                    "Parse Error: Unexpected token '{0}' of type {3} on line {1}, expected token of type(s): {2}",
+                    ct.lexeme, ct.lineNumber, s, ct.ToString());
+            }
+        }
+
+        private void CycleTokens()
+        {
+            this.ct = this.nt;
+            this.nt = a.getNextToken();
         }
 
         private void Prog()
         {
+            //Prog->modulet idt semicolont DeclarativePart 
+            //      StatementPart endt idt periodt
             Match(Tokens.modulet);
             Match(Tokens.idt);
             Match(Tokens.semicolont);
@@ -37,6 +65,7 @@ namespace OberonCompiler
 
         private void DeclarativePart()
         {
+            //DeclarativePart -> ConstPart VarPart ProcPart
             ConstPart();
             VarPart();
             ProcPart();
@@ -138,6 +167,7 @@ namespace OberonCompiler
 
         private void ProcedureDecl()
         {
+            //ProcedureDecl -> ProcHeading semicolont ProcBody idt semicolont
             ProcHeading();
             Match(Tokens.semicolont);
             ProcBody();
@@ -147,6 +177,7 @@ namespace OberonCompiler
 
         private void ProcHeading()
         {
+            //ProcHeading -> proceduret idt Args
             Match(Tokens.proceduret);
             Match(Tokens.idt);
             Args();
@@ -154,6 +185,7 @@ namespace OberonCompiler
 
         private void ProcBody()
         {
+            //ProcBody -> DeclarativePart StatementPart endt
             DeclarativePart();
             StatementPart();
             Match(Tokens.endt);
@@ -173,6 +205,7 @@ namespace OberonCompiler
 
         private void ArgList()
         {
+            // ArgList->Mode IdentifierList colont TypeMark MoreArgs
             Mode();
             IdentifierList();
             Match(Tokens.colont);

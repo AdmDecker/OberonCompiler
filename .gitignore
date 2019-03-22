@@ -1,3 +1,5 @@
 OberonCompiler/bin
 OberonCompiler/obj
 .vs
+/OberonCompiler/OberonCompiler.csproj.user
+/OberonCompiler.zip
