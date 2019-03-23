@@ -9,11 +9,21 @@ namespace OberonCompiler
     class SymTable
     {
         const int tableSize = 211;
+        const int padWidth = 15;
         Record[] table = new Record[tableSize];
 
         //Insert(lex, token, depth) - insert the lexeme, token and depth into a record in the symbol table.
         public Record Insert(string lex, Symbol token, int depth)
         {
+            var existingRecord = Lookup(lex);
+            if (existingRecord != null && existingRecord.depth == depth)
+            {
+                Console.WriteLine("Error on line {0}, symbol {1} already declared at this scope",
+                    token.lineNumber, lex);
+                Console.ReadLine();
+                Environment.Exit(1);
+            }
+
             Record newRecord = new Record(token, depth);
 
             int hash = this.Hash(lex);
@@ -79,7 +89,7 @@ namespace OberonCompiler
         //at a specified depth. [ this will be useful for debugging your compiler ]
         public void WriteTable(int depth)
         {
-            Console.WriteLine("In-Table lexeme");
+            Console.WriteLine("Writing Depth {0}", depth.ToString());
             for(int i = 0; i < tableSize; i++)
             {
                 DisplayLinked(table[i], depth);
@@ -93,7 +103,7 @@ namespace OberonCompiler
                 return;
 
             if (r.depth == depth)
-                Console.WriteLine(r.symbol.lexeme);
+                Console.WriteLine("{0}{1}", r.symbol.lexeme.PadRight(padWidth), r.type.ToString());
 
             DisplayLinked(r.nextNode, depth);
         }
@@ -122,7 +132,8 @@ namespace OberonCompiler
     {
         VARIABLE,
         CONSTANT,
-        PROCEDURE
+        PROCEDURE,
+        NONE
     }
 
     class Record
@@ -139,7 +150,20 @@ namespace OberonCompiler
         public Symbol symbol;
         //PROPERTIES
         //Type of record (VARIABLE, CONSTANT, PROCEDURE)
-        public RecordTypes type;
+
+        public RecordTypes type
+        {
+            get
+            {
+                if (varRecord != null)
+                    return RecordTypes.VARIABLE;
+                if (constRecord != null)
+                    return RecordTypes.CONSTANT;
+                if (procRecord != null)
+                    return RecordTypes.PROCEDURE;
+                return RecordTypes.NONE;
+            }
+        }
 
         public VariableRecord varRecord;
         public ConstantRecord constRecord;
@@ -219,6 +243,12 @@ namespace OberonCompiler
             this.sizeOfLocal += rec.size;
         }
 
+        public void AddLocal(ConstantRecord rec)
+        {
+            int size = rec.value != null ? 2 : 4;
+            this.sizeOfLocal += size;
+        }
+
         //Linked list of parameters
         public Parameter parameters;
     }
@@ -230,8 +260,8 @@ namespace OberonCompiler
             this.type = type;
             this.modeIsVar = modeIsVar;
         }
-        VarTypes type;
-        bool modeIsVar;
+        public VarTypes type;
+        public bool modeIsVar;
 
         public void Add(Parameter param)
         {
