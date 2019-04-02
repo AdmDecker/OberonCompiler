@@ -5,6 +5,8 @@ VisualStudioVersion = 15.0.27130.2003
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OberonCompiler", "OberonCompiler\OberonCompiler.csproj", "{2E453152-0E5C-467F-AEA9-C2F710371C7C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OberonCompilerTests", "OberonCompilerTests\OberonCompilerTests.csproj", "{92AE9D3E-166A-4304-80A9-572803AD7E21}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{2E453152-0E5C-467F-AEA9-C2F710371C7C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2E453152-0E5C-467F-AEA9-C2F710371C7C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2E453152-0E5C-467F-AEA9-C2F710371C7C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{92AE9D3E-166A-4304-80A9-572803AD7E21}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{92AE9D3E-166A-4304-80A9-572803AD7E21}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{92AE9D3E-166A-4304-80A9-572803AD7E21}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{92AE9D3E-166A-4304-80A9-572803AD7E21}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

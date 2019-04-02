@@ -8,18 +8,24 @@ using System.Threading.Tasks;
 
 namespace OberonCompiler
 {
-    enum Tokens {
+
+    public interface IAnalyzer
+    {
+        Token getNextToken();
+    }
+    
+    public enum Tokens {
         modulet, proceduret, vart, begint, endt, ift, thent, elset, elseift, whilet, dot, arrayt,
         recordt, constt, typet, idt, addopt, mulopt, numt, relopt, assignopt, symbolt, unknownt, eoft,
         stringt, errort, emptyt, commat, semicolont, colont, periodt, equalt, lparent, rparent, integert,
-        realt, chart
+        realt, chart, minust, tildet
     }
 
-    enum CharTypes { alpha, numerical, period, relational, math, unknown, eof, quote,
+    public enum CharTypes { alpha, numerical, period, relational, math, unknown, eof, quote,
         whitespace
     }
 
-    class Analyzer
+    public class Analyzer : IAnalyzer
     {
         protected delegate bool Matches(char x);
 
@@ -58,10 +64,10 @@ namespace OberonCompiler
             }
         }
 
-        public Symbol getNextToken()
+        public Token getNextToken()
         {
             if (eof)
-                return new Symbol(Tokens.eoft, lineNumber);
+                return new Token(Tokens.eoft, lineNumber);
 
             fetchWhile((i) =>
             {
@@ -69,7 +75,7 @@ namespace OberonCompiler
             });
 
             var t = mapType(curChar);
-            Symbol s;
+            Token s;
             switch (t)
             {
                 case CharTypes.alpha:
@@ -97,7 +103,7 @@ namespace OberonCompiler
             return s;
         }
 
-        protected Symbol processWord()
+        protected Token processWord()
         {
             var lexeme = fetchWhile((i) =>
             {
@@ -106,13 +112,13 @@ namespace OberonCompiler
 
             if (reservedWords.ContainsKey(lexeme))
             {
-                return new Symbol(reservedWords[lexeme], lineNumber, lexeme);
+                return new Token(reservedWords[lexeme], lineNumber, lexeme);
             }
 
-            return new Symbol(Tokens.idt, lineNumber, lexeme);   
+            return new Token(Tokens.idt, lineNumber, lexeme);   
         }
 
-        protected Symbol processNumber()
+        protected Token processNumber()
         {
             var beforePeriod = fetchWhile((i) =>
             {
@@ -120,7 +126,7 @@ namespace OberonCompiler
             });
 
             if (curChar != '.')
-                return new Symbol(Tokens.numt, lineNumber, null, int.Parse(beforePeriod));
+                return new Token(Tokens.numt, lineNumber, null, int.Parse(beforePeriod));
 
             fetchChars();
             var afterPeriod = fetchWhile((i) =>
@@ -129,7 +135,7 @@ namespace OberonCompiler
             });
 
             string fullValue = String.Format("{0}.{1}", beforePeriod.ToString(), afterPeriod.ToString());
-            return new Symbol(
+            return new Token(
                 Tokens.numt,
                 lineNumber,
                 null,
@@ -138,33 +144,35 @@ namespace OberonCompiler
             );
         }
 
-        protected Symbol processRelOp()
+        protected Token processRelOp()
         {
 
             if (curChar != '=' && curChar != '#' && nextChar == '=')
             {
                 var lexeme = curChar.ToString() + nextChar.ToString();
-                fetchChars(2);
-
                 Tokens token = curChar == ':' ? Tokens.assignopt : Tokens.relopt;
 
-                return new Symbol(token, lineNumber, lexeme);
+                fetchChars(2);
+
+                return new Token(token, lineNumber, lexeme);
             }
             else if (curChar == '=')
-                return new Symbol(Tokens.equalt, lineNumber, curChar.ToString());
+                return new Token(Tokens.equalt, lineNumber, curChar.ToString());
             else if (curChar == ':')
-                return new Symbol(Tokens.colont, lineNumber, curChar.ToString());
+                return new Token(Tokens.colont, lineNumber, curChar.ToString());
 
-            return new Symbol(Tokens.relopt, lineNumber, curChar.ToString());   
+            return new Token(Tokens.relopt, lineNumber, curChar.ToString());   
         }
 
-        protected Symbol processOther()
+        protected Token processOther()
         {
             char[] symbols = new char[] { '{', '}', '[', ']', '`', '~' };
             char[] mulops = new char[] { '*', '/', '&' };
-            char[] addops = new char[] { '+', '-' };
+            char[] addops = new char[] { '+'};
 
             var lexeme = curChar.ToString();
+
+
 
             if (curChar == '.' && char.IsDigit(nextChar))
                 return processNumber();
@@ -177,11 +185,15 @@ namespace OberonCompiler
             }
 
             if (curChar == -1)
-                return new Symbol(Tokens.eoft, lineNumber, lexeme);
+                return new Token(Tokens.eoft, lineNumber, lexeme);
 
             Tokens t;
 
-            if (symbols.Contains(curChar))
+            if (curChar == '~')
+                t = Tokens.tildet;
+            if (curChar == '-')
+                t = Tokens.minust;
+            else if (symbols.Contains(curChar))
                 t = Tokens.symbolt;
             else if (mulops.Contains(curChar))
                 t = Tokens.mulopt;
@@ -203,10 +215,10 @@ namespace OberonCompiler
                 t = Tokens.unknownt;
 
             fetchChars();
-            return new Symbol(t, lineNumber, lexeme);
+            return new Token(t, lineNumber, lexeme);
         }
 
-        protected Symbol processString()
+        protected Token processString()
         {
             char quoteType = curChar;
             fetchChars();
@@ -216,9 +228,9 @@ namespace OberonCompiler
             });
 
             if (curChar == quoteType)
-                return new Symbol(Tokens.stringt, lineNumber, lexeme);
+                return new Token(Tokens.stringt, lineNumber, lexeme);
             else
-                return new Symbol(Tokens.errort, lineNumber, "Error: Unterminated string literal");
+                return new Token(Tokens.errort, lineNumber, "Error: Unterminated string literal");
         }
 
         protected void skipComments()
@@ -302,18 +314,18 @@ namespace OberonCompiler
         };
 }
 
-    class Symbol
+    public class Token
     {
-        public Symbol(Tokens token, int linenumber, string lexeme = null, int? value = null, double? valueR = null)
+        public Token(Tokens token, int linenumber, string lexeme = null, int? value = null, double? valueR = null)
         {
-            this.token = token;
+            this.type = token;
             this.lexeme = lexeme;
             this.value = value;
             this.valueR = valueR;
             lineNumber = linenumber;
         }
 
-        public Tokens token;
+        public Tokens type;
         public string lexeme;
         public int lineNumber;
         public int? value;
@@ -335,7 +347,7 @@ namespace OberonCompiler
             return String.Format(
                 "{0, -5}\t{1, -16}\t{2}",
                 this.lineNumber.ToString(),
-                token.ToString(),
+                type.ToString(),
                 value
             );
         }

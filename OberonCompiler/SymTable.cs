@@ -6,14 +6,15 @@ using System.Threading.Tasks;
 
 namespace OberonCompiler
 {
-    class SymTable
+
+    public class SymTable
     {
         const int tableSize = 211;
         const int padWidth = 15;
         Record[] table = new Record[tableSize];
 
         //Insert(lex, token, depth) - insert the lexeme, token and depth into a record in the symbol table.
-        public Record Insert(string lex, Symbol token, int depth)
+        public Record Insert(string lex, Token token, int depth)
         {
             var existingRecord = Lookup(lex);
             if (existingRecord != null && existingRecord.depth == depth)
@@ -128,26 +129,27 @@ namespace OberonCompiler
         }
     }
 
-    enum RecordTypes
+    public enum RecordTypes
     {
         VARIABLE,
         CONSTANT,
         PROCEDURE,
-        NONE
+        NONE,
+        MODULE
     }
 
-    class Record
+    public class Record
     {
-        public Record(Symbol token, int depth)
+        public Record(Token token, int depth)
         {
-            this.token = token.token;
+            this.token = token.type;
             this.symbol = token;
             this.depth = depth;
         }
 
         public int depth;
         public Tokens token;
-        public Symbol symbol;
+        public Token symbol;
         //PROPERTIES
         //Type of record (VARIABLE, CONSTANT, PROCEDURE)
 
@@ -161,7 +163,7 @@ namespace OberonCompiler
                     return RecordTypes.CONSTANT;
                 if (procRecord != null)
                     return RecordTypes.PROCEDURE;
-                return RecordTypes.NONE;
+                return RecordTypes.MODULE;
             }
         }
 
@@ -172,20 +174,20 @@ namespace OberonCompiler
         public Record nextNode;
     }
 
-    enum VarTypes
+    public enum VarTypes
     {
         charType,
         intType,
         floatType,
     }
 
-    enum ConstTypes
+    public enum ConstTypes
     {
         intType,
         realType,
     }
 
-    class VariableRecord {
+    public class VariableRecord {
         public VariableRecord(VarTypes type, int offset, int size)
         {
             this.type = type;
@@ -198,9 +200,9 @@ namespace OberonCompiler
         public int size;
     }
 
-    class ConstantRecord
+    public class ConstantRecord
     {
-        public ConstantRecord(Symbol s)
+        public ConstantRecord(Token s)
         {
             if (s.value != null)
             {
@@ -218,7 +220,7 @@ namespace OberonCompiler
         public double? valueR;
     }
 
-    class ProcedureRecord
+    public class ProcedureRecord
     {
         public VarTypes returnType;
         public int sizeOfLocal = 0;
@@ -253,7 +255,7 @@ namespace OberonCompiler
         public Parameter parameters;
     }
 
-    class Parameter
+    public class Parameter
     {
         public Parameter(VarTypes type, bool modeIsVar)
         {

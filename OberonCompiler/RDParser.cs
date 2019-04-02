@@ -7,16 +7,17 @@ using System.Threading.Tasks;
 namespace OberonCompiler
 {
     //Recursive descent parser
-    class RDParser
+    public class RDParser
     {
-        private Symbol ct; //Current token
-        private Symbol nt; //Next token
-        Analyzer a;
+        private Token ct; //Current type
+        private Token nt; //Next type
+        IAnalyzer a;
         SymTable symTable;
         int offset = 0;
         private int depth = 0;
+        Stack<string> headingLexes = new Stack<string>();
 
-        public void Goal(Analyzer a, SymTable s)
+        public void Goal(IAnalyzer a, SymTable s)
         {
             this.a = a;
             this.symTable = s;
@@ -27,29 +28,64 @@ namespace OberonCompiler
             Console.WriteLine("Parse completed successfully");
         }
 
-        public void Match(params Tokens[] t)
+        private void Crash(string format, params object[] args)
         {
-            CycleTokens();
-            bool success = false;
-            foreach( Tokens b in t)
+            Console.WriteLine(format, args);
+            Console.ReadLine();
+            Environment.Exit(1);
+        }
+
+        private void PopHeadingLex(Token t)
+        {
+            string pop = "";
+            string failMessage = string.Format("Error on line {0}, end statement with no matching begin",
+                    t.lineNumber);
+            try
             {
-                if (ct.token == b)
-                    success = true;
+                pop = headingLexes.Pop();
             }
+            catch
+            {
+                Crash(failMessage);
+            }
+
+            Record rec = symTable.Lookup(t.lexeme);
+            if (rec == null)
+                Crash(failMessage);
+
+            if (t.lexeme != pop)
+                Crash("Error on line {0}: end statement does not match '{2}' declared on line {3}",
+                    t.lineNumber, rec.symbol.lexeme, rec.symbol.lineNumber);
+        }
+
+        private void Match(params Tokens[] t)
+        {
+            bool success = Peek(t);
+            CycleTokens();
 
             if (!success)
             {
                 string s = "";
                 foreach(Tokens f in t)
                 {
+                    s += '\n';
                     s += f.ToString();
                 }
-                Console.WriteLine(
-                    "Parse Error: Unexpected token '{0}' of type {3} on line {1}, expected token of type(s): {2}",
-                    ct.lexeme, ct.lineNumber, s, ct.token.ToString());
-                Console.ReadLine();
-                Environment.Exit(1);
+                Crash(
+                    "Parse Error: Unexpected type '{0}' of type {3} on line {1}, expected type of type(s): {2}",
+                    ct.lexeme, ct.lineNumber, s, ct.type.ToString());
             }
+        }
+
+        private bool Peek(params Tokens[] t)
+        {
+            foreach (Tokens b in t)
+            {
+                if (nt.type == b)
+                    return true;
+            }
+
+            return false;
         }
 
         private void CycleTokens()
@@ -64,11 +100,14 @@ namespace OberonCompiler
             //      StatementPart endt idt periodt
             Match(Tokens.modulet);
             Match(Tokens.idt);
+            symTable.Insert(ct.lexeme, ct, 0);
+            headingLexes.Push(ct.lexeme);
             Match(Tokens.semicolont);
             DeclarativePart();
             StatementPart();
             Match(Tokens.endt);
             Match(Tokens.idt);
+            PopHeadingLex(ct);
             Match(Tokens.periodt);
         }
 
@@ -83,7 +122,7 @@ namespace OberonCompiler
         private void ConstPart(string procLex)
         {
             //ConstPart -> constt ConstTail
-            if (nt.token == Tokens.constt)
+            if (nt.type == Tokens.constt)
             {
                 Match(Tokens.constt);
                 ConstTail(procLex);
@@ -94,7 +133,7 @@ namespace OberonCompiler
         private void ConstTail(string procLex)
         {
             //ConstTail -> idt equalt Value semicolont ConstTail
-            if (nt.token == Tokens.idt)
+            if (nt.type == Tokens.idt)
             {
                 Match(Tokens.idt);
                 var rec = symTable.Insert(ct.lexeme, ct, depth);
@@ -104,6 +143,13 @@ namespace OberonCompiler
                 Match(Tokens.semicolont);
                 if (procLex != "")
                 {
+                    if (procLex == ct.lexeme)
+                    {
+                        Console.WriteLine("Error on line {0} when declaring constant {1}. Constants cannot have the same name as their enclosing procedure",
+                            rec.symbol.lineNumber, ct.lexeme);
+                        Console.ReadLine();
+                        Environment.Exit(1);
+                    }
                     Record pr = symTable.Lookup(procLex);
                     pr.procRecord.AddLocal(rec.constRecord);
                 }
@@ -117,7 +163,7 @@ namespace OberonCompiler
         {
             offset = 0;
            //VarPart->vart VarTail
-           if (nt.token == Tokens.vart)
+           if (nt.type == Tokens.vart)
            {
               Match(Tokens.vart);
               VarTail(procLex);
@@ -128,7 +174,7 @@ namespace OberonCompiler
         private void VarTail(string procLex)
         {
             //VarTail -> IdentifierList colont TypeMark semicolont VarTail
-            if (nt.token == Tokens.idt)
+            if (nt.type == Tokens.idt)
             {
                 var list = IdentifierList();
                 Match(Tokens.colont);
@@ -142,6 +188,12 @@ namespace OberonCompiler
                     entry.varRecord = new VariableRecord(type, offset, varSize);
                     if(procLex != "")
                     {
+                        if (procLex == id)
+                        {
+                            Crash(string.Format("Error on line {0} when declaring variable {1}. Variables cannot have the same name as their enclosing procedure",
+                                entry.symbol.lineNumber, id));
+                        }
+
                         Record pr = symTable.Lookup(procLex);
                         pr.procRecord.AddLocal(entry.varRecord);
                     }
@@ -166,7 +218,7 @@ namespace OberonCompiler
         {
             List<string> ids = new List<string>();
             //IdentifierList' -> commat idt IdentifierList'
-            if (nt.token == Tokens.commat)
+            if (nt.type == Tokens.commat)
             {
                 Match(Tokens.commat);
                 Match(Tokens.idt);
@@ -184,7 +236,7 @@ namespace OberonCompiler
             //TypeMark->realt
             //TypeMark->chart
             Match(Tokens.integert, Tokens.chart, Tokens.realt);
-            switch(ct.token)
+            switch(ct.type)
             {
                 case Tokens.integert:
                     return VarTypes.intType;
@@ -196,7 +248,7 @@ namespace OberonCompiler
             throw new Exception();
         }
 
-        private Symbol Value()
+        private Token Value()
         {
             //Value -> numt
             Match(Tokens.numt);
@@ -206,7 +258,7 @@ namespace OberonCompiler
         private void ProcPart()
         {
             //ProcPart->ProcedureDecl ProcPart
-            if (nt.token == Tokens.proceduret)
+            if (nt.type == Tokens.proceduret)
             {
                 ProcedureDecl();
                 ProcPart();
@@ -218,11 +270,14 @@ namespace OberonCompiler
         {
             //ProcedureDecl -> ProcHeading semicolont ProcBody idt semicolont
             var procLex = ProcHeading();
+            headingLexes.Push(procLex);
             Match(Tokens.semicolont);
             ProcBody(procLex);
 
-            //don't worry about this idt, it's after hte proc
+            //popperino
             Match(Tokens.idt);
+            PopHeadingLex(ct);
+
             Match(Tokens.semicolont);
 
             symTable.WriteTable(depth);
@@ -254,7 +309,7 @@ namespace OberonCompiler
         private void Args(string procLex)
         {
             //Args -> lparent ArgList rparent
-            if(nt.token == Tokens.lparent)
+            if(nt.type == Tokens.lparent)
             {
                 Match(Tokens.lparent);
                 var list = ArgList(procLex);
@@ -298,7 +353,7 @@ namespace OberonCompiler
         private List<string> MoreArgs(string procLex)
         {
             //MoreArgs -> semicolont ArgList
-            if (nt.token == Tokens.semicolont)
+            if (nt.type == Tokens.semicolont)
             {
                 Match(Tokens.semicolont);
                 return ArgList(procLex);
@@ -310,7 +365,7 @@ namespace OberonCompiler
         private bool Mode()
         {
             //Mode -> vart
-            if (nt.token == Tokens.vart)
+            if (nt.type == Tokens.vart)
             {
                 Match(Tokens.vart);
                 return true;
@@ -322,7 +377,7 @@ namespace OberonCompiler
         private void StatementPart()
         {
             //StatementPart -> begint SeqOfStatements
-            if (nt.token == Tokens.begint)
+            if (nt.type == Tokens.begint)
             {
                 Match(Tokens.begint);
                 SeqOfStatements();
@@ -332,7 +387,152 @@ namespace OberonCompiler
 
         private void SeqOfStatements()
         {
-            //SeqOfStatements -> emptyt
+            //SeqOfStatements -> Statement ; StatTail | e
+            if (nt.type == Tokens.idt)
+            {
+                Statement();
+                Match(Tokens.semicolont);
+                StatTail();
+            }
+        }
+
+        private void StatTail()
+        {
+            //StatTail -> Statment ; StatTail | e
+            if (nt.type == Tokens.idt)
+            {
+                Statement();
+                Match(Tokens.semicolont);
+                StatTail();
+            }
+        }
+
+        private void Statement()
+        {
+            //Statement -> AssignStat | IOStat
+            if (nt.type == Tokens.idt)
+            {
+                AssignStat();
+            }
+        }
+
+        private void AssignStat()
+        {
+            //AssignStat -> idt := Expr
+            Match(Tokens.idt);
+            //Verify identifier is declared and is variable
+            var sym = symTable.Lookup(ct.lexeme);
+            if (sym == null)
+            {
+                Crash("Error on line {0}: Undeclared variable {1} used in assignment statment",
+                    ct.lineNumber, ct.lexeme);
+            }
+            else if (sym.type != RecordTypes.VARIABLE)
+            {
+                Crash("Error on line {0}: identifier {1} is not of type VARIABLE",
+                    ct.lineNumber, ct.lexeme);
+            }
+
+            Match(Tokens.assignopt);
+            Expr();
+        }
+
+        private void IOStat()
+        {
+            //e
+        }
+
+        private void Expr()
+        {
+            //Expr -> Relation
+            Relation();
+        }
+
+        private void Relation()
+        {
+            //Relation -> SimpleExpr
+            SimpleExpr();
+        }
+
+        private void SimpleExpr()
+        {
+            //SimpleExpr -> Term MoreTerm
+            Term();
+            MoreTerm();
+        }
+
+        private void MoreTerm()
+        {
+            //MoreTerm -> Addop Term MoreTerm | e
+            Peek();
+            Addop();
+            Term();
+            MoreTerm();
+        }
+
+        private void Term()
+        {
+            //Term -> Factor MoreFactor
+            Factor();
+            MoreFactor();
+        }
+
+        private void MoreFactor()
+        {
+            //MoreFactor -> Mulop Factor MoreFactor | e
+            if (Peek(Tokens.mulopt))
+            {
+                Mulop();
+                Factor();
+                MoreFactor();
+            }
+        }
+
+        private void Factor()
+        {
+            //Factor -> idt | numt | ( Expr ) | ~ Factor | SignOp Factor
+            switch (nt.type)
+            {
+                case Tokens.idt:
+                    Match(Tokens.idt); break;
+                case Tokens.numt:
+                    Match(Tokens.numt); break;
+                case Tokens.lparent:
+                    Match(Tokens.lparent);
+                    Expr();
+                    Match(Tokens.rparent);
+                    break;
+                case Tokens.tildet:
+                    Match(Tokens.tildet);
+                    Factor();
+                    break;
+                case Tokens.minust:
+                    SignOp();
+                    Factor();
+                    break;
+                default:
+                    Match(Tokens.idt, Tokens.numt, Tokens.lparent, Tokens.tildet, Tokens.minust);break;
+            }
+        }
+
+        private void Addop()
+        {
+            //Addop -> + | - | OR
+            //Tokens.addopt = + | OR
+            Match(Tokens.addopt, Tokens.minust);
+        }
+
+        private void Mulop()
+        {
+            //Mulop -> * | / | DIV | MOD | &
+            //Tokens.mulopt = DIV | MOD | * | / | &
+            Match(Tokens.mulopt);
+        }
+
+        private void SignOp()
+        {
+            //SignOp -> -
+            Match(Tokens.minust);
         }
     }
 }
