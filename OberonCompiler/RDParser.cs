@@ -9,19 +9,26 @@ namespace OberonCompiler
     //Recursive descent parser
     public class RDParser
     {
-        private Token ct; //Current type
-        private Token nt; //Next type
+        //External component references
         IAnalyzer a;
         SymTable symTable;
+        Emitter e;
+
+
+        private Token ct; //Current type
+        private Token nt; //Next type
         int offset = 0;
         private int depth = 0;
         Stack<string> headingLexes = new Stack<string>();
 
-        public void Goal(IAnalyzer a, SymTable s)
+        public void Goal(IAnalyzer a, SymTable s, Emitter e)
         {
+            this.e = e;
             this.a = a;
             this.symTable = s;
             this.nt = a.getNextToken();
+            
+
             Prog();
             symTable.WriteTable(0);
             Match(Tokens.eoft);
@@ -72,7 +79,7 @@ namespace OberonCompiler
                     s += f.ToString();
                 }
                 Crash(
-                    "Parse Error: Unexpected type '{0}' of type {3} on line {1}, expected type of type(s): {2}",
+                    "Parse Error: Unexpected token '{0}' of type {3} on line {1}, expected type of type(s): {2}",
                     ct.lexeme, ct.lineNumber, s, ct.type.ToString());
             }
         }
@@ -86,6 +93,14 @@ namespace OberonCompiler
             }
 
             return false;
+        }
+
+        private bool PeekOrMatch(params Tokens[] t)
+        {
+            bool peek = Peek(t);
+            if (peek)
+                Match(t);
+            return peek;
         }
 
         private void CycleTokens()
@@ -416,27 +431,6 @@ namespace OberonCompiler
             }
         }
 
-        private void AssignStat()
-        {
-            //AssignStat -> idt := Expr
-            Match(Tokens.idt);
-            //Verify identifier is declared and is variable
-            var sym = symTable.Lookup(ct.lexeme);
-            if (sym == null)
-            {
-                Crash("Error on line {0}: Undeclared variable {1} used in assignment statment",
-                    ct.lineNumber, ct.lexeme);
-            }
-            else if (sym.type != RecordTypes.VARIABLE)
-            {
-                Crash("Error on line {0}: identifier {1} is not of type VARIABLE",
-                    ct.lineNumber, ct.lexeme);
-            }
-
-            Match(Tokens.assignopt);
-            Expr();
-        }
-
         private void IOStat()
         {
             //e
@@ -464,10 +458,12 @@ namespace OberonCompiler
         private void MoreTerm()
         {
             //MoreTerm -> Addop Term MoreTerm | e
-            Peek();
-            Addop();
-            Term();
-            MoreTerm();
+            if (Peek(Tokens.addopt, Tokens.minust))
+            {
+                Addop();
+                Term();
+                MoreTerm();
+            }
         }
 
         private void Term()
@@ -533,6 +529,97 @@ namespace OberonCompiler
         {
             //SignOp -> -
             Match(Tokens.minust);
+        }
+
+        private void AssignStat()
+        {
+            //AssignStat -> idt := Expr | ProcCall
+
+            Match(Tokens.idt);
+            //Match idt
+            if (Peek(Tokens.lparent))
+            {
+                ProcCall();
+            }
+            else if (Peek(Tokens.assignopt))
+            {
+                var symbol = symTable.Lookup(ct.lexeme);
+                if (symbol == null)
+                {
+                    Crash("Error on line {0}: Undeclared variable {1} used in assignment statment",
+                        ct.lineNumber, ct.lexeme);
+                }
+                if (symbol.type == RecordTypes.CONSTANT
+                    || symbol.type == RecordTypes.VARIABLE)
+                {
+                    Match(Tokens.idt);
+                    Match(Tokens.assignopt);
+                    Expr();
+                }
+                else Crash("Attempted to assign non-")
+            }
+            else Match(Tokens.lparent, Tokens.assignopt);
+        }
+
+        private void ProcCall()
+        {
+            //ProcCall -> idt ( Params )
+
+            //Already matched idt in AssignStat(), so skip
+            var symbol = symTable.Lookup(ct.lexeme);
+            if (symbol == null)
+            {
+                Crash("Error on line {0}: Attempted to call undeclared procedure '{1}'",
+                    ct.lineNumber, ct.lexeme);
+            }
+            if (symbol.type == RecordTypes.PROCEDURE)
+            {
+                Match(Tokens.lparent);
+                Params();
+                Match(Tokens.rparent);
+            }
+            else
+                Crash("Error on line {0}, attempted to call non-proc symbol {1}",
+                    ct.lineNumber, ct.lexeme);
+        }
+
+        private List<Arg> Params()
+        {
+            List<Arg> args = new List<Arg>();
+            //Params -> idt ParamsTail | num ParamsTail | e
+            if (PeekOrMatch(Tokens.numt, Tokens.idt))
+            {
+                string name;
+                bool isRef;
+                if(ct.type == Tokens.numt)
+                {
+                    name
+                }
+                else if (ct.type == Tokens.idt)
+                {
+
+                }
+                ParamsTail();
+            }
+
+            return args;
+        }
+
+        private void ParamsTail()
+        {
+            //ParamsTail -> , idt ParamsTail | , num ParamsTail | e
+            if (PeekOrMatch(Tokens.commat))
+            {
+                if (PeekOrMatch(Tokens.numt))
+                {
+                    ParamsTail();
+                }
+                else if (PeekOrMatch(Tokens.idt))
+                {
+                    ParamsTail();
+                }
+                else Match(Tokens.numt, Tokens.idt);
+            }
         }
     }
 }
