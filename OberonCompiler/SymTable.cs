@@ -9,6 +9,7 @@ namespace OberonCompiler
 
     public class SymTable
     {
+        public int offset = 0;
         const int tableSize = 211;
         const int padWidth = 15;
         Record[] table = new Record[tableSize];

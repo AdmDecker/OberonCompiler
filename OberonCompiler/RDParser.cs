@@ -17,7 +17,6 @@ namespace OberonCompiler
 
         private Token ct; //Current type
         private Token nt; //Next type
-        int offset = 0;
         private int depth = 0;
         Stack<string> headingLexes = new Stack<string>();
 
@@ -33,13 +32,6 @@ namespace OberonCompiler
             symTable.WriteTable(0);
             Match(Tokens.eoft);
             Console.WriteLine("Parse completed successfully");
-        }
-
-        private void Crash(string format, params object[] args)
-        {
-            Console.WriteLine(format, args);
-            Console.ReadLine();
-            Environment.Exit(1);
         }
 
         private void PopHeadingLex(Token t)
@@ -58,10 +50,10 @@ namespace OberonCompiler
 
             Record rec = symTable.Lookup(t.lexeme);
             if (rec == null)
-                Crash(failMessage);
+                Error.Crash(failMessage);
 
             if (t.lexeme != pop)
-                Crash("Error on line {0}: end statement does not match '{2}' declared on line {3}",
+                Error.Crash("Error on line {0}: end statement does not match '{2}' declared on line {3}",
                     t.lineNumber, rec.symbol.lexeme, rec.symbol.lineNumber);
         }
 
@@ -78,7 +70,7 @@ namespace OberonCompiler
                     s += '\n';
                     s += f.ToString();
                 }
-                Crash(
+                Error.Crash(
                     "Parse Error: Unexpected token '{0}' of type {3} on line {1}, expected type of type(s): {2}",
                     ct.lexeme, ct.lineNumber, s, ct.type.ToString());
             }
@@ -176,7 +168,7 @@ namespace OberonCompiler
 
         private void VarPart(string procLex)
         {
-            offset = 0;
+            symTable.offset = 0;
            //VarPart->vart VarTail
            if (nt.type == Tokens.vart)
            {
@@ -200,7 +192,8 @@ namespace OberonCompiler
                 foreach (var id in list)
                 {
                     var entry = symTable.Lookup(id);
-                    entry.varRecord = new VariableRecord(type, offset, varSize);
+                    entry.varRecord = new VariableRecord(type, symTable.offset, varSize);
+                    symTable.offset += varSize;
                     if(procLex != "")
                     {
                         if (procLex == id)
