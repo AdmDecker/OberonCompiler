@@ -576,43 +576,29 @@ namespace OberonCompiler
                     ct.lineNumber, ct.lexeme);
         }
 
-        private List<Arg> Params()
+        private List<Token> Params()
         {
-            List<Arg> args = new List<Arg>();
-            //Params -> idt ParamsTail | num ParamsTail | e
+            List<Token> args = new List<Token>();
+            //Params -> idt ParamsTail | numt ParamsTail | e
             if (PeekOrMatch(Tokens.numt, Tokens.idt))
             {
-                string name;
-                bool isRef;
-                if(ct.type == Tokens.numt)
-                {
-                    name
-                }
-                else if (ct.type == Tokens.idt)
-                {
-
-                }
-                ParamsTail();
+                args.Add(ct);
+                args.AddRange(ParamsTail());
             }
-
             return args;
         }
 
-        private void ParamsTail()
+        private List<Token> ParamsTail()
         {
+            var args = new List<Token>();
             //ParamsTail -> , idt ParamsTail | , num ParamsTail | e
             if (PeekOrMatch(Tokens.commat))
             {
-                if (PeekOrMatch(Tokens.numt))
-                {
-                    ParamsTail();
-                }
-                else if (PeekOrMatch(Tokens.idt))
-                {
-                    ParamsTail();
-                }
-                else Match(Tokens.numt, Tokens.idt);
+                Match(Tokens.idt, Tokens.numt);
+                args.Add(ct);
+                ParamsTail();
             }
+            return args;
         }
     }
 }
