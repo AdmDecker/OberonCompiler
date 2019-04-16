@@ -189,16 +189,34 @@ namespace OberonCompiler
     }
 
     public class VariableRecord {
-        public VariableRecord(VarTypes type, int offset, int size)
+        public VariableRecord(VarTypes type, int offset, int size, int depth, bool isArgument)
         {
             this.type = type;
             this.offset = offset;
             this.size = size;
+            this.isArgument = isArgument;
+            this.depth = depth;
         }
 
         public VarTypes type;
         public int offset;
         public int size;
+        public int depth;
+        public bool isArgument;
+        public string lexeme;
+
+        public string getTACString()
+        {
+            if (depth == 0)
+            {
+                return lexeme; 
+            }
+            else
+            {
+                char op = isArgument ? '+' : '-';
+                return "_bp" + op + offset;
+            }
+        }
     }
 
     public class ConstantRecord
@@ -219,6 +237,15 @@ namespace OberonCompiler
         public ConstTypes type;
         public int? value;
         public double? valueR;
+
+        public string getTACString()
+        {
+            if (value != null)
+                return value.ToString();
+            else if (valueR != null)
+                return valueR.ToString();
+            return "Error - No data for constant";
+        }
     }
 
     public class ProcedureRecord

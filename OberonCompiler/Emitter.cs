@@ -92,6 +92,39 @@ namespace OberonCompiler
 
         public void EmitAssignment(Token lexemeLeft, Token lexemeRight)// a := _tX
         {
+
+        }
+
+        private string getValueString(Token token, int depth)
+        {
+            if (token.type == Tokens.vart)
+                return getVariableTokenValue(token, depth);
+            else if (token.type == Tokens.constt)
+                return getConstTokenValue(token, depth);
+
+        }
+
+        private string getVariableTokenValue(Token token)
+        {
+            var symbol = symTable.Lookup(token.lexeme);
+            if (symbol != null && symbol.varRecord != null)
+            {
+                return symbol.varRecord.getTACString();
+            }
+
+            Error.Crash("Error on line {0}: Use of undeclared variable {1}", token.lineNumber, token.lexeme);
+            return "";
+        }
+
+        private string getContTokenValue(Token token)
+        {
+            var symbol = symTable.Lookup(token.lexeme);
+            if (symbol != null && symbol.constRecord != null)
+            {
+                return symbol.constRecord.getTACString();
+            }
+
+            Error.Crash("Error on line {0}: Use of undeclared constant {1}", token.lineNumber, token.lexeme);
         }
     }
 }
