@@ -539,7 +539,7 @@ namespace OberonCompiler
                 var symbol = symTable.Lookup(ct.lexeme);
                 if (symbol == null)
                 {
-                    Crash("Error on line {0}: Undeclared variable {1} used in assignment statment",
+                    Error.Crash("Error on line {0}: Undeclared variable {1} used in assignment statment",
                         ct.lineNumber, ct.lexeme);
                 }
                 if (symbol.type == RecordTypes.CONSTANT
@@ -549,7 +549,7 @@ namespace OberonCompiler
                     Match(Tokens.assignopt);
                     Expr();
                 }
-                else Crash("Attempted to assign non-")
+                else Error.Crash("Attempted to assign non-")
             }
             else Match(Tokens.lparent, Tokens.assignopt);
         }
@@ -562,7 +562,7 @@ namespace OberonCompiler
             var symbol = symTable.Lookup(ct.lexeme);
             if (symbol == null)
             {
-                Crash("Error on line {0}: Attempted to call undeclared procedure '{1}'",
+                Error.Crash("Error on line {0}: Attempted to call undeclared procedure '{1}'",
                     ct.lineNumber, ct.lexeme);
             }
             if (symbol.type == RecordTypes.PROCEDURE)
@@ -572,7 +572,7 @@ namespace OberonCompiler
                 Match(Tokens.rparent);
             }
             else
-                Crash("Error on line {0}, attempted to call non-proc symbol {1}",
+                Error.Crash("Error on line {0}, attempted to call non-proc symbol {1}",
                     ct.lineNumber, ct.lexeme);
         }
 

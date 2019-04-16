@@ -31,6 +31,11 @@ namespace OberonCompiler
             EmitLine("endp {0}", procName);
         }
 
+        public void EmitProgramEnd(string programName)
+        {
+            EmitLine("START {0}", programName);
+        }
+
         public void EmitProcedureCall(Token procedureToken, params Token [] argLexemes)
         {
             Record record = symTable.Lookup(procedureToken.lexeme);
@@ -73,12 +78,19 @@ namespace OberonCompiler
             EmitLine("call {0}", procedureToken.lexeme);
         }
 
-        public string EmitExpression(string left, Token lexemeOp, string lexemeRight)
+        public string EmitExpression(Token left, Token lexemeOp, Token right, int depth)
         {
-            
+            //So here we're looking to turn an expression into a temporary variable
+            string tempVarLex = "_t" + temporaryVariableCounter++.ToString();
+            //Make our temporary variable as a token
+            Token tempVar = new Token(Tokens.vart, left.lineNumber, tempVarLex);
+            var record = symTable.Insert(tempVarLex, tempVar, depth);
+            record.varRecord = new VariableRecord(VarTypes.intType, symTable.offset, 2);
+
+            EmitLine("{0} {1} {2}", record.varRecord.)
         }
 
-        public void EmitAssignment(string lexemeLeft, string lexemeRight)// a := _tX
+        public void EmitAssignment(Token lexemeLeft, Token lexemeRight)// a := _tX
         {
         }
     }
