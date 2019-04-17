@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -17,11 +18,15 @@ namespace OberonCompiler
             }
             else
             {
-                SymTable symTable = new SymTable();
-                RDParser parser = new RDParser();
-                Analyzer a = new Analyzer(args[0]);
-
-                parser.Goal(a, symTable);
+                string TACPath = args[0].TrimEnd(".obr".ToArray()) + ".tac";
+                using (StreamWriter sw = File.CreateText(TACPath))
+                {
+                    SymTable symTable = new SymTable();
+                    RDParser parser = new RDParser();
+                    Analyzer a = new Analyzer(args[0]);
+                    Emitter e = new Emitter(symTable, sw);
+                    parser.Goal(a, symTable, e);
+                }
             }
 
             Console.ReadLine();

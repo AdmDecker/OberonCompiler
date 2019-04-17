@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -9,16 +10,18 @@ namespace OberonCompiler
     public class Emitter
     {
         SymTable symTable;
+        StreamWriter streamWriter;
         int temporaryVariableCounter = 0;
 
-        public Emitter(SymTable symTable)
+        public Emitter(SymTable symTable, StreamWriter streamWriter)
         {
             this.symTable = symTable;
+            this.streamWriter = streamWriter;
         }
 
         private void EmitLine(string line, params string[] args)
         {
-            
+            streamWriter.WriteLine(line, args);
         }
 
         public void EmitProcedureStart(string procName)
@@ -49,59 +52,105 @@ namespace OberonCompiler
                 if (parameter == null) Error.Crash("Error on line {0}, too many arguments in procedure call", procedureToken.lineNumber);
                 bool passByReference = parameter.modeIsVar;
                 string v = "ERROR IN Emmitter.EmitProcedureCall(): CODE PATH DID NOT ASSIGN 'V'";
-                Record argRecord = symTable.Lookup(arg.lexeme);
-                if (argRecord == null) Error.Crash("Error on line {0}, attempted to call procedure with undeclared argument {1}", arg.lineNumber, arg.lexeme);
-
                 if (arg.type == Tokens.numt) //LITERAL
                 {
-                    v = arg.lexeme;
+                    v = getLiteralTokenValue(arg);
+                    VarTypes type = arg.value != null ? VarTypes.intType : VarTypes.floatType;
+                    if (type != parameter.type)
+                        Error.Crash("Error on line {0}: Mismatched argument type. Type of literal '{1}' is not of type {2}", arg.lineNumber, arg.lexeme, parameter.type.ToString());
                 }
-                else if (argRecord.type == RecordTypes.CONSTANT) //CONSTANT
+                else
                 {
-                    //Verify we don't try to pass constant by reference
-                    if (passByReference) Error.Crash("Error on line {0}, attempted to pass CONSTANT value '{1}' by reference", arg.lineNumber, arg.lexeme);
-                    v = arg.lexeme;
+                    Record argRecord = symTable.Lookup(arg.lexeme);
+                    if (argRecord == null) Error.Crash("Error on line {0}, attempted to call procedure with undeclared argument {1}", arg.lineNumber, arg.lexeme);
+                    else if (argRecord.type == RecordTypes.CONSTANT) //CONSTANT
+                    {
+                        //Verify we don't try to pass constant by reference
+                        if (passByReference) Error.Crash("Error on line {0}, attempted to pass CONSTANT value '{1}' by reference", arg.lineNumber, arg.lexeme);
+                        v = getConstTokenValue(arg);
+                        if (argRecord.constRecord.type != parameter.type)
+                            Error.Crash("Error on line {0}: Mismatched argument type. Type of '{1}' is not of type {2}", arg.lineNumber, arg.lexeme, parameter.type.ToString());
+                    }
+                    else if (argRecord.type == RecordTypes.VARIABLE) //VARIABLE
+                    {
+                        if (passByReference)
+                            v = "@" + arg.lexeme;
+                        else v = getVariableTokenValue(arg);
+
+                        if (argRecord.varRecord.type != parameter.type)
+                            Error.Crash("Error on line {0}: Mismatched argument type. Type of '{1}' is not of type {2}", arg.lineNumber, arg.lexeme, parameter.type.ToString());
+                    }
+                    else Error.Crash("Error on line {0}, argument {1} has no value", arg.lineNumber, arg.lexeme);
                 }
-                else if (argRecord.type == RecordTypes.VARIABLE) //VARIABLE
-                {
-                    if (passByReference)
-                        v = "@" + arg.lexeme;
-                    else v = arg.lexeme;
-                }
-                else Error.Crash("Error on line {0}, argument {1} has no value", arg.lineNumber, arg.lexeme);
 
                 EmitLine("push {0}", v);
 
                 parameter = parameter.nextParameter;
             }
+            if (parameter != null)
+                Error.Crash("Error on line {0}: Not enough arguments in '{1}' function call", procedureToken.lineNumber, procedureToken.lexeme);
 
             EmitLine("call {0}", procedureToken.lexeme);
         }
 
-        public string EmitExpression(Token left, Token lexemeOp, Token right, int depth)
+        public Token EmitExpression(Token left, Token op, Token right, int depth)
+        {
+            var record = getTempVarToken(depth);
+
+            EmitLine("{0} {1} {2} {3} {4}", 
+                record.varRecord.getTACString(), 
+                "\t=\t",
+                getValueString(left),
+                op.lexeme,
+                getValueString(right));
+            return new Token(Tokens.idt, -1, record.symbol.lexeme);
+        }
+
+        private Record getTempVarToken(int depth)
         {
             //So here we're looking to turn an expression into a temporary variable
             string tempVarLex = "_t" + temporaryVariableCounter++.ToString();
             //Make our temporary variable as a token
-            Token tempVar = new Token(Tokens.vart, left.lineNumber, tempVarLex);
+            Token tempVar = new Token(Tokens.idt, -1, tempVarLex);
             var record = symTable.Insert(tempVarLex, tempVar, depth);
-            record.varRecord = new VariableRecord(VarTypes.intType, symTable.offset, 2);
-
-            EmitLine("{0} {1} {2}", record.varRecord.)
+            record.varRecord = new VariableRecord(tempVar, VarTypes.intType, symTable.offset, 2, depth, false, false);
+            symTable.incrementOffset(2);
+            return record;
         }
 
-        public void EmitAssignment(Token lexemeLeft, Token lexemeRight)// a := _tX
+        public Token EmitBuffer(Token bufferedVariable, int depth)
         {
-
+            var token = getTempVarToken(depth).symbol;
+            EmitAssignment(token, bufferedVariable);
+            return token;
         }
 
-        private string getValueString(Token token, int depth)
+        public void EmitAssignment(Token left, Token right)// a := _tX
         {
-            if (token.type == Tokens.vart)
-                return getVariableTokenValue(token, depth);
+            EmitLine("{0}\t=\t{1}", getValueString(left), getValueString(right));
+        }
+
+        public Token EmitNegation(Token t, int depth)
+        {
+            //My expression: 0 - t
+            return EmitExpression(
+                new Token(Tokens.numt, -1, "0", 0, 0),
+                new Token(Tokens.minust, -1, "-"),
+                t,
+                depth);
+        }
+
+        private string getValueString(Token token)
+        {
+            if (token.type == Tokens.idt)
+                return getVariableTokenValue(token);
             else if (token.type == Tokens.constt)
-                return getConstTokenValue(token, depth);
+                return getConstTokenValue(token);
+            else if (token.type == Tokens.numt)
+                return getLiteralTokenValue(token);
 
+            Error.Crash("Error on line {0}: Unexpected token '{1}' in expression emission", token.lineNumber, token.lexeme);
+            return "";
         }
 
         private string getVariableTokenValue(Token token)
@@ -116,7 +165,7 @@ namespace OberonCompiler
             return "";
         }
 
-        private string getContTokenValue(Token token)
+        private string getConstTokenValue(Token token)
         {
             var symbol = symTable.Lookup(token.lexeme);
             if (symbol != null && symbol.constRecord != null)
@@ -125,6 +174,13 @@ namespace OberonCompiler
             }
 
             Error.Crash("Error on line {0}: Use of undeclared constant {1}", token.lineNumber, token.lexeme);
+            return "";
+        }
+
+        private string getLiteralTokenValue(Token token)
+        {
+            var obj = new LiteralValue(token.lexeme);
+            return obj.getTACString();
         }
     }
 }

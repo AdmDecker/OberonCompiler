@@ -45,7 +45,7 @@ namespace OberonCompiler
             }
             catch
             {
-                Crash(failMessage);
+                Error.Crash(failMessage);
             }
 
             Record rec = symTable.Lookup(t.lexeme);
@@ -71,7 +71,7 @@ namespace OberonCompiler
                     s += f.ToString();
                 }
                 Error.Crash(
-                    "Parse Error: Unexpected token '{0}' of type {3} on line {1}, expected type of type(s): {2}",
+                    "Parse Error: Unexpected token '{0}' of type {3} on line {1}, expected one of the following types: {2}",
                     ct.lexeme, ct.lineNumber, s, ct.type.ToString());
             }
         }
@@ -107,15 +107,18 @@ namespace OberonCompiler
             //      StatementPart endt idt periodt
             Match(Tokens.modulet);
             Match(Tokens.idt);
+            var programName = ct.lexeme;
             symTable.Insert(ct.lexeme, ct, 0);
             headingLexes.Push(ct.lexeme);
             Match(Tokens.semicolont);
             DeclarativePart();
-            StatementPart();
+            StatementPart(programName);
             Match(Tokens.endt);
             Match(Tokens.idt);
             PopHeadingLex(ct);
+            e.EmitProcedureEnd(programName);
             Match(Tokens.periodt);
+            e.EmitProgramEnd(programName);
         }
 
         private void DeclarativePart(string procLex = "")
@@ -168,7 +171,7 @@ namespace OberonCompiler
 
         private void VarPart(string procLex)
         {
-            symTable.offset = 0;
+            symTable.resetOffset();
            //VarPart->vart VarTail
            if (nt.type == Tokens.vart)
            {
@@ -192,13 +195,13 @@ namespace OberonCompiler
                 foreach (var id in list)
                 {
                     var entry = symTable.Lookup(id);
-                    entry.varRecord = new VariableRecord(type, symTable.offset, varSize);
-                    symTable.offset += varSize;
+                    entry.varRecord = new VariableRecord(entry.symbol, type, symTable.offset, varSize, depth, false, false);
+                    symTable.incrementOffset(varSize);
                     if(procLex != "")
                     {
                         if (procLex == id)
                         {
-                            Crash(string.Format("Error on line {0} when declaring variable {1}. Variables cannot have the same name as their enclosing procedure",
+                            Error.Crash(string.Format("Error on line {0} when declaring variable {1}. Variables cannot have the same name as their enclosing procedure",
                                 entry.symbol.lineNumber, id));
                         }
 
@@ -291,6 +294,7 @@ namespace OberonCompiler
             symTable.WriteTable(depth);
             symTable.DeleteDepth(depth);
             depth--;
+            e.EmitProcedureEnd(procLex);
         }
 
         private string ProcHeading()
@@ -310,7 +314,7 @@ namespace OberonCompiler
         {
             //ProcBody -> DeclarativePart StatementPart endt
             DeclarativePart(procLex);
-            StatementPart();
+            StatementPart(procLex);
             Match(Tokens.endt);
         }
 
@@ -348,9 +352,9 @@ namespace OberonCompiler
             foreach(var id in list)
             {
                 int size = type == VarTypes.floatType ? 4 : 2;
-                var rec = new VariableRecord(type, 0, size);
-                procRec.procRecord.AddParameter(rec, hasVarMode);
                 var vRec = symTable.Lookup(id);
+                var rec = new VariableRecord(vRec.symbol, type, 0, size, depth, true, hasVarMode);
+                procRec.procRecord.AddParameter(rec, hasVarMode);
                 vRec.varRecord = rec;
             }
             
@@ -382,12 +386,12 @@ namespace OberonCompiler
             return false;
         }
 
-        private void StatementPart()
+        private void StatementPart(string procLex)
         {
             //StatementPart -> begint SeqOfStatements
-            if (nt.type == Tokens.begint)
+            if (PeekOrMatch(Tokens.begint))
             {
-                Match(Tokens.begint);
+                e.EmitProcedureStart(procLex);
                 SeqOfStatements();
             }
             //StatementPart -> emptyt
@@ -396,7 +400,7 @@ namespace OberonCompiler
         private void SeqOfStatements()
         {
             //SeqOfStatements -> Statement ; StatTail | e
-            if (nt.type == Tokens.idt)
+            if (Peek(Tokens.idt))
             {
                 Statement();
                 Match(Tokens.semicolont);
@@ -407,7 +411,7 @@ namespace OberonCompiler
         private void StatTail()
         {
             //StatTail -> Statment ; StatTail | e
-            if (nt.type == Tokens.idt)
+            if (Peek(Tokens.idt))
             {
                 Statement();
                 Match(Tokens.semicolont);
@@ -418,10 +422,12 @@ namespace OberonCompiler
         private void Statement()
         {
             //Statement -> AssignStat | IOStat
-            if (nt.type == Tokens.idt)
+            if (Peek(Tokens.idt))
             {
                 AssignStat();
             }
+            else
+                IOStat();
         }
 
         private void IOStat()
@@ -429,93 +435,101 @@ namespace OberonCompiler
             //e
         }
 
-        private void Expr()
+        private Token Expr() //returns temp var
         {
             //Expr -> Relation
-            Relation();
+            return Relation();
         }
 
-        private void Relation()
+        private Token Relation() // returns temp var
         {
             //Relation -> SimpleExpr
-            SimpleExpr();
+            return SimpleExpr();
         }
 
-        private void SimpleExpr()
+        private Token SimpleExpr() // returns temp var
         {
             //SimpleExpr -> Term MoreTerm
-            Term();
-            MoreTerm();
+            var l = Term();
+            return MoreTerm(l);
         }
 
-        private void MoreTerm()
+        private Token MoreTerm(Token synth)
         {
             //MoreTerm -> Addop Term MoreTerm | e
             if (Peek(Tokens.addopt, Tokens.minust))
             {
-                Addop();
-                Term();
-                MoreTerm();
+                var op = Addop();
+                var l = Term();
+                var r = MoreTerm(l);
+                return e.EmitExpression(synth, op, r, depth);
             }
+            return synth;
         }
 
-        private void Term()
+        private Token Term()
         {
             //Term -> Factor MoreFactor
-            Factor();
-            MoreFactor();
+            var l = Factor();
+            return MoreFactor(l);
         }
 
-        private void MoreFactor()
+        private Token MoreFactor(Token synth)
         {
             //MoreFactor -> Mulop Factor MoreFactor | e
             if (Peek(Tokens.mulopt))
             {
-                Mulop();
-                Factor();
-                MoreFactor();
+                var op = Mulop();
+                var l = Factor();
+                var r = MoreFactor(l);
+                return e.EmitExpression(synth, op, r, depth); // throw away L because it got synthed into R anyway
             }
+            return synth;
         }
 
-        private void Factor()
+        private Token Factor() //returns the THING
         {
             //Factor -> idt | numt | ( Expr ) | ~ Factor | SignOp Factor
             switch (nt.type)
             {
                 case Tokens.idt:
-                    Match(Tokens.idt); break;
+                    Match(Tokens.idt);
+                    return ct;
                 case Tokens.numt:
-                    Match(Tokens.numt); break;
+                    Match(Tokens.numt);
+                    return ct;
                 case Tokens.lparent:
                     Match(Tokens.lparent);
-                    Expr();
+                    var tempVar = Expr();
                     Match(Tokens.rparent);
-                    break;
+                    return tempVar;
                 case Tokens.tildet:
                     Match(Tokens.tildet);
-                    Factor();
-                    break;
+                    return Factor();
                 case Tokens.minust:
                     SignOp();
-                    Factor();
-                    break;
+                    var factor = Factor();
+                    return e.EmitNegation(factor, depth);
                 default:
-                    Match(Tokens.idt, Tokens.numt, Tokens.lparent, Tokens.tildet, Tokens.minust);break;
+                    Match(Tokens.idt, Tokens.numt, Tokens.lparent, Tokens.tildet, Tokens.minust);
+                    return TokenFactory.createEmptyToken();
             }
         }
 
-        private void Addop()
+        private Token Addop()
         {
             //Addop -> + | - | OR
             //Tokens.addopt = + | OR
             Match(Tokens.addopt, Tokens.minust);
+            return ct;
         }
 
-        private void Mulop()
+        private Token Mulop()
         {
             //Mulop -> * | / | DIV | MOD | &
             //Tokens.mulopt = DIV | MOD | * | / | &
             Match(Tokens.mulopt);
+            return ct;
         }
 
         private void SignOp()
@@ -542,14 +556,11 @@ namespace OberonCompiler
                     Error.Crash("Error on line {0}: Undeclared variable {1} used in assignment statment",
                         ct.lineNumber, ct.lexeme);
                 }
-                if (symbol.type == RecordTypes.CONSTANT
-                    || symbol.type == RecordTypes.VARIABLE)
-                {
-                    Match(Tokens.idt);
-                    Match(Tokens.assignopt);
-                    Expr();
-                }
-                else Error.Crash("Attempted to assign non-")
+                var l = ct;
+                Match(Tokens.assignopt);
+                var expr = Expr();
+                var buffer = e.EmitBuffer(expr, depth);
+                e.EmitAssignment(l, buffer);
             }
             else Match(Tokens.lparent, Tokens.assignopt);
         }
@@ -568,8 +579,10 @@ namespace OberonCompiler
             if (symbol.type == RecordTypes.PROCEDURE)
             {
                 Match(Tokens.lparent);
-                Params();
+                var args = Params();
                 Match(Tokens.rparent);
+
+                e.EmitProcedureCall(symbol.symbol, args.ToArray());
             }
             else
                 Error.Crash("Error on line {0}, attempted to call non-proc symbol {1}",
@@ -596,7 +609,7 @@ namespace OberonCompiler
             {
                 Match(Tokens.idt, Tokens.numt);
                 args.Add(ct);
-                ParamsTail();
+                args.AddRange(ParamsTail());
             }
             return args;
         }

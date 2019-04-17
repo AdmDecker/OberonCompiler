@@ -9,7 +9,13 @@ namespace OberonCompiler
 
     public class SymTable
     {
-        public int offset = 0;
+        public int _offset = 2;
+        public int offset { get => _offset; }
+        public void incrementOffset(int value) { _offset += value; }
+        public void resetOffset() { _offset = 2; }
+
+
+
         const int tableSize = 211;
         const int padWidth = 15;
         Record[] table = new Record[tableSize];
@@ -175,84 +181,11 @@ namespace OberonCompiler
         public Record nextNode;
     }
 
-    public enum VarTypes
-    {
-        charType,
-        intType,
-        floatType,
-    }
-
-    public enum ConstTypes
-    {
-        intType,
-        realType,
-    }
-
-    public class VariableRecord {
-        public VariableRecord(VarTypes type, int offset, int size, int depth, bool isArgument)
-        {
-            this.type = type;
-            this.offset = offset;
-            this.size = size;
-            this.isArgument = isArgument;
-            this.depth = depth;
-        }
-
-        public VarTypes type;
-        public int offset;
-        public int size;
-        public int depth;
-        public bool isArgument;
-        public string lexeme;
-
-        public string getTACString()
-        {
-            if (depth == 0)
-            {
-                return lexeme; 
-            }
-            else
-            {
-                char op = isArgument ? '+' : '-';
-                return "_bp" + op + offset;
-            }
-        }
-    }
-
-    public class ConstantRecord
-    {
-        public ConstantRecord(Token s)
-        {
-            if (s.value != null)
-            {
-                this.type = ConstTypes.intType;
-                value = s.value;
-            }
-            else if (s.valueR != null)
-            {
-                this.type = ConstTypes.realType;
-                valueR = s.valueR;
-            }
-        }
-        public ConstTypes type;
-        public int? value;
-        public double? valueR;
-
-        public string getTACString()
-        {
-            if (value != null)
-                return value.ToString();
-            else if (valueR != null)
-                return valueR.ToString();
-            return "Error - No data for constant";
-        }
-    }
-
     public class ProcedureRecord
     {
         public VarTypes returnType;
         public int sizeOfLocal = 0;
-        public int sizeOfParameters = 0;
+        public int sizeOfParameters = 2;
 
         public int numberOfParameters = 0;
 

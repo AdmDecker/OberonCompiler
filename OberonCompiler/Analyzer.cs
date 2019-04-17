@@ -126,7 +126,7 @@ namespace OberonCompiler
             });
 
             if (curChar != '.')
-                return new Token(Tokens.numt, lineNumber, null, int.Parse(beforePeriod));
+                return new Token(Tokens.numt, lineNumber, beforePeriod, int.Parse(beforePeriod));
 
             fetchChars();
             var afterPeriod = fetchWhile((i) =>
@@ -138,7 +138,7 @@ namespace OberonCompiler
             return new Token(
                 Tokens.numt,
                 lineNumber,
-                null,
+                fullValue,
                 null,
                 double.Parse(fullValue)   
             );
@@ -152,7 +152,7 @@ namespace OberonCompiler
                 var lexeme = curChar.ToString() + nextChar.ToString();
                 Tokens token = curChar == ':' ? Tokens.assignopt : Tokens.relopt;
 
-                fetchChars(2);
+                fetchChars();
 
                 return new Token(token, lineNumber, lexeme);
             }
