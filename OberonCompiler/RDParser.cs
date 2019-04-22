@@ -432,7 +432,91 @@ namespace OberonCompiler
 
         private void IOStat()
         {
+            //IO_Stat -> In_Stat | Out_Stat
+            if (Peek(Tokens.readt))
+                In_Stat();
+            else
+                Out_Stat();
+        }
+
+        private void In_Stat()
+        {
+            //In_Stat -> read(Id_List)
+            Match(Tokens.readt);
+            Match(Tokens.lparent);
+            e.EmitReadStatement(Id_List());
+            Match(Tokens.rparent);
+        }
+
+        private List<Token> Id_List()
+        {
+            var idlist = new List<Token>();
+            //Id_List -> idt Id_List_Tail
+            Match(Tokens.idt);
+            idlist.Add(ct);
+            idlist.AddRange(Id_List_Tail());
+            return idlist;
+        }
+
+        private List<Token> Id_List_Tail()
+        {
+            var idlist = new List<Token>();
+            //Id_List_Tail -> , idt Id_List_Tail | e
+            if (PeekOrMatch(Tokens.commat))
+            {
+                Match(Tokens.idt);
+                idlist.Add(ct);
+                idlist.AddRange(Id_List_Tail());
+            }
             //e
+            return idlist;
+        }
+
+        private void Out_Stat()
+        {
+            //Out_Stat -> write(Write_List) | writeln(Write_List)
+            if (PeekOrMatch(Tokens.writet))
+            {
+                Match(Tokens.lparent);
+                Write_List();
+                Match(Tokens.rparent);
+            }
+            else if (PeekOrMatch(Tokens.writelnt))
+            {
+                Match(Tokens.lparent);
+                Write_List();
+                Match(Tokens.rparent);
+            }
+            else Match(Tokens.writet, Tokens.writelnt); //this will fail
+        }
+
+        private List<Token> Write_List()
+        {
+            var writeList = new List<Token>();
+            //Write_List -> Write_Token Write_List_Tail
+            writeList.Add(Write_Token());
+            writeList.AddRange(Write_List_Tail());
+            return writeList;
+        }
+
+        private List<Token> Write_List_Tail()
+        {
+            var writeList = new List<Token>();
+            //Write_List_Tail -> , Write_Token Write_List_Tail | e
+            if (PeekOrMatch(Tokens.commat))
+            {
+                writeList.Add(Write_Token());
+                writeList.AddRange(Write_List_Tail());
+            }
+            //e
+            return writeList;
+        }
+
+        private Token Write_Token()
+        {
+            //Write_Token -> idt | numt | literal
+            Match(Tokens.idt, Tokens.numt, Tokens.stringt);
+            return ct;
         }
 
         private Token Expr() //returns temp var

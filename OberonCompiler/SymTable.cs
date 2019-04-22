@@ -60,6 +60,25 @@ namespace OberonCompiler
             return curRecord;
         }
 
+        public List<Record> GetRecordsAtDepth(int depth)
+        {
+            List<Record> records = new List<Record>();
+
+            for (int i = 0; i < tableSize; i++)
+            {
+                Record curRecord = table[i];
+
+                while (curRecord != null)
+                {
+                    if (curRecord.depth == depth)
+                        records.Add(curRecord);
+                    curRecord = curRecord.nextNode;
+                }
+            }
+
+            return records;
+        }
+
         //DeleteDepth(depth) - delete is passed the depth and deletes all records that are in the table at that depth.
         public void DeleteDepth(int depth)
         {
@@ -142,7 +161,8 @@ namespace OberonCompiler
         CONSTANT,
         PROCEDURE,
         NONE,
-        MODULE
+        MODULE,
+        LITERAL
     }
 
     public class Record

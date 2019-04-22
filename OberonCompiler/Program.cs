@@ -18,14 +18,24 @@ namespace OberonCompiler
             }
             else
             {
+                SymTable symTable = new SymTable();
                 string TACPath = args[0].TrimEnd(".obr".ToArray()) + ".tac";
                 using (StreamWriter sw = File.CreateText(TACPath))
                 {
-                    SymTable symTable = new SymTable();
                     RDParser parser = new RDParser();
                     Analyzer a = new Analyzer(args[0]);
                     Emitter e = new Emitter(symTable, sw);
                     parser.Goal(a, symTable, e);
+                }
+
+                using (StreamReader sr = File.OpenText(TACPath))
+                {
+                    string asmPath = args[0].TrimEnd(".obr".ToArray()) + ".asm";
+                    using (StreamWriter sw = File.CreateText(asmPath))
+                    {
+                        CodeGenerator gen = new CodeGenerator(symTable, sr, sw);
+                        gen.Generate();
+                    }
                 }
             }
 

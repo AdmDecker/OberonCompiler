@@ -18,7 +18,7 @@ namespace OberonCompiler
         modulet, proceduret, vart, begint, endt, ift, thent, elset, elseift, whilet, dot, arrayt,
         recordt, constt, typet, idt, addopt, mulopt, numt, relopt, assignopt, symbolt, unknownt, eoft,
         stringt, errort, emptyt, commat, semicolont, colont, periodt, equalt, lparent, rparent, integert,
-        realt, chart, minust, tildet
+        realt, chart, minust, tildet, readt, writet, writelnt
     }
 
     public enum CharTypes { alpha, numerical, period, relational, math, unknown, eof, quote,
@@ -310,7 +310,10 @@ namespace OberonCompiler
             { "MOD", Tokens.mulopt },
             { "INTEGER", Tokens.integert },
             { "REAL", Tokens.realt },
-            { "CHAR", Tokens.chart }
+            { "CHAR", Tokens.chart },
+            { "READ", Tokens.readt },
+            { "WRITE", Tokens.writet },
+            { "WRITELN", Tokens.writelnt },
         };
 }
 

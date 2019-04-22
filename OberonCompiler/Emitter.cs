@@ -39,6 +39,43 @@ namespace OberonCompiler
             EmitLine("START {0}", programName);
         }
 
+        public void EmitReadStatement(List<Token> idlist)
+        {
+            foreach (Token id in idlist) EmitRead(id);
+        }
+
+        private void EmitRead(Token id)
+        {
+            EmitLine("rdi {0}", getVariableTokenValue(id));
+        }
+
+        public void EmitWriteStatement(List<Token> writeList)
+        {
+            foreach (Token token in writeList) EmitWrite(token);
+        }
+
+        private void EmitWrite(Token token)
+        {
+            if (token.type == Tokens.idt)
+            {
+
+            }
+            else if (token.type == Tokens.numt)
+            {
+                EmitLine("wri {0}", token.lexeme);
+            }
+            else if (token.type == Tokens.stringt)
+            {
+                foreach (char c in token.lexeme)
+                {
+                    EmitLine("wrs {0}", c.ToString());
+                }
+
+                EmitLine("wrln");
+            }
+            else Error.Crash("ERROR IN Emitter.EmitWrite(): unwritable token passed to write procedure");
+        }
+
         public void EmitProcedureCall(Token procedureToken, params Token [] argLexemes)
         {
             Record record = symTable.Lookup(procedureToken.lexeme);

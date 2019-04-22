@@ -43,6 +43,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Analyzer.cs" />
+    <Compile Include="CodeGenerator.cs" />
     <Compile Include="DataObject.cs" />
     <Compile Include="Emitter.cs" />
     <Compile Include="Error.cs" />
