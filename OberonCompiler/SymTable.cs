@@ -162,7 +162,8 @@ namespace OberonCompiler
         PROCEDURE,
         NONE,
         MODULE,
-        LITERAL
+        LITERAL,
+        STRINGLITERAL,
     }
 
     public class Record
@@ -190,6 +191,8 @@ namespace OberonCompiler
                     return RecordTypes.CONSTANT;
                 if (procRecord != null)
                     return RecordTypes.PROCEDURE;
+                if (stringRecord != null)
+                    return RecordTypes.STRINGLITERAL;
                 return RecordTypes.MODULE;
             }
         }
@@ -197,6 +200,7 @@ namespace OberonCompiler
         public VariableRecord varRecord;
         public ConstantRecord constRecord;
         public ProcedureRecord procRecord;
+        public StringLiteral stringRecord;
 
         public Record nextNode;
     }
@@ -205,7 +209,7 @@ namespace OberonCompiler
     {
         public VarTypes returnType;
         public int sizeOfLocal = 0;
-        public int sizeOfParameters = 2;
+        public int sizeOfParameters = 0;
 
         public int numberOfParameters = 0;
 

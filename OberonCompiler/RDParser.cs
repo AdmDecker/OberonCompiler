@@ -26,7 +26,6 @@ namespace OberonCompiler
             this.a = a;
             this.symTable = s;
             this.nt = a.getNextToken();
-            
 
             Prog();
             symTable.WriteTable(0);
@@ -108,11 +107,12 @@ namespace OberonCompiler
             Match(Tokens.modulet);
             Match(Tokens.idt);
             var programName = ct.lexeme;
-            symTable.Insert(ct.lexeme, ct, 0);
+            var record = symTable.Insert(ct.lexeme, ct, 0);
+            record.procRecord = new ProcedureRecord();
             headingLexes.Push(ct.lexeme);
             Match(Tokens.semicolont);
             DeclarativePart();
-            StatementPart(programName);
+            StatementPart(record);
             Match(Tokens.endt);
             Match(Tokens.idt);
             PopHeadingLex(ct);
@@ -121,26 +121,26 @@ namespace OberonCompiler
             e.EmitProgramEnd(programName);
         }
 
-        private void DeclarativePart(string procLex = "")
+        private void DeclarativePart(ProcedureRecord procedure = null)
         {
             //DeclarativePart -> ConstPart VarPart ProcPart
-            ConstPart(procLex);
-            VarPart(procLex);
+            ConstPart(procedure);
+            VarPart(procedure);
             ProcPart();
         }
 
-        private void ConstPart(string procLex)
+        private void ConstPart(ProcedureRecord procedure)
         {
             //ConstPart -> constt ConstTail
             if (nt.type == Tokens.constt)
             {
                 Match(Tokens.constt);
-                ConstTail(procLex);
+                ConstTail(procedure);
             }
             //ConstPart -> emptyt
         }
 
-        private void ConstTail(string procLex)
+        private void ConstTail(ProcedureRecord procedure)
         {
             //ConstTail -> idt equalt Value semicolont ConstTail
             if (nt.type == Tokens.idt)
@@ -151,37 +151,29 @@ namespace OberonCompiler
                 var s = Value();
                 rec.constRecord = new ConstantRecord(s);
                 Match(Tokens.semicolont);
-                if (procLex != "")
+                if (procedure != null)
                 {
-                    if (procLex == ct.lexeme)
-                    {
-                        Console.WriteLine("Error on line {0} when declaring constant {1}. Constants cannot have the same name as their enclosing procedure",
-                            rec.symbol.lineNumber, ct.lexeme);
-                        Console.ReadLine();
-                        Environment.Exit(1);
-                    }
-                    Record pr = symTable.Lookup(procLex);
-                    pr.procRecord.AddLocal(rec.constRecord);
+                    procedure.AddLocal(rec.constRecord);
                 }
 
-                ConstTail(procLex);
+                ConstTail(procedure);
             }
             //ConstTail -> emptyt
         }
 
-        private void VarPart(string procLex)
+        private void VarPart(ProcedureRecord procedure)
         {
             symTable.resetOffset();
            //VarPart->vart VarTail
            if (nt.type == Tokens.vart)
            {
               Match(Tokens.vart);
-              VarTail(procLex);
+              VarTail(procedure);
            }
            //VarPart -> emptyt
         }
 
-        private void VarTail(string procLex)
+        private void VarTail(ProcedureRecord procedure)
         {
             //VarTail -> IdentifierList colont TypeMark semicolont VarTail
             if (nt.type == Tokens.idt)
@@ -197,19 +189,12 @@ namespace OberonCompiler
                     var entry = symTable.Lookup(id);
                     entry.varRecord = new VariableRecord(entry.symbol, type, symTable.offset, varSize, depth, false, false);
                     symTable.incrementOffset(varSize);
-                    if(procLex != "")
+                    if(procedure != null)
                     {
-                        if (procLex == id)
-                        {
-                            Error.Crash(string.Format("Error on line {0} when declaring variable {1}. Variables cannot have the same name as their enclosing procedure",
-                                entry.symbol.lineNumber, id));
-                        }
-
-                        Record pr = symTable.Lookup(procLex);
-                        pr.procRecord.AddLocal(entry.varRecord);
+                        procedure.AddLocal(entry.varRecord);
                     }
                 }
-                VarTail(procLex);
+                VarTail(procedure);
             }
             //VarTail -> emptyt
         }
@@ -280,10 +265,10 @@ namespace OberonCompiler
         private void ProcedureDecl()
         {
             //ProcedureDecl -> ProcHeading semicolont ProcBody idt semicolont
-            var procLex = ProcHeading();
-            headingLexes.Push(procLex);
+            var record = ProcHeading();
+            headingLexes.Push(record.symbol.lexeme);
             Match(Tokens.semicolont);
-            ProcBody(procLex);
+            ProcBody(record);
 
             //popperino
             Match(Tokens.idt);
@@ -294,10 +279,10 @@ namespace OberonCompiler
             symTable.WriteTable(depth);
             symTable.DeleteDepth(depth);
             depth--;
-            e.EmitProcedureEnd(procLex);
+            e.EmitProcedureEnd(record.symbol.lexeme);
         }
 
-        private string ProcHeading()
+        private Record ProcHeading()
         {
             //ProcHeading -> proceduret idt Args
             Match(Tokens.proceduret);
@@ -305,16 +290,15 @@ namespace OberonCompiler
             var rec = symTable.Insert(ct.lexeme, ct, depth);
             rec.procRecord = new ProcedureRecord();
             depth++;
-            string procLex = ct.lexeme;
             Args(ct.lexeme);
-            return procLex;
+            return rec;
         }
 
-        private void ProcBody(string procLex)
+        private void ProcBody(Record record)
         {
             //ProcBody -> DeclarativePart StatementPart endt
-            DeclarativePart(procLex);
-            StatementPart(procLex);
+            DeclarativePart(record.procRecord);
+            StatementPart(record);
             Match(Tokens.endt);
         }
 
@@ -386,45 +370,45 @@ namespace OberonCompiler
             return false;
         }
 
-        private void StatementPart(string procLex)
+        private void StatementPart(Record procedure)
         {
             //StatementPart -> begint SeqOfStatements
             if (PeekOrMatch(Tokens.begint))
             {
-                e.EmitProcedureStart(procLex);
-                SeqOfStatements();
+                e.EmitProcedureStart(procedure.symbol.lexeme);
+                SeqOfStatements(procedure.procRecord);
             }
             //StatementPart -> emptyt
         }
 
-        private void SeqOfStatements()
+        private void SeqOfStatements(ProcedureRecord procedure)
         {
             //SeqOfStatements -> Statement ; StatTail | e
-            if (Peek(Tokens.idt))
+            if (Peek(Tokens.idt, Tokens.readt, Tokens.writelnt, Tokens.writet))
             {
-                Statement();
+                Statement(procedure);
                 Match(Tokens.semicolont);
-                StatTail();
+                StatTail(procedure);
             }
         }
 
-        private void StatTail()
+        private void StatTail(ProcedureRecord procedure)
         {
             //StatTail -> Statment ; StatTail | e
-            if (Peek(Tokens.idt))
+            if (Peek(Tokens.idt, Tokens.readt, Tokens.writelnt, Tokens.writet))
             {
-                Statement();
+                Statement(procedure);
                 Match(Tokens.semicolont);
-                StatTail();
+                StatTail(procedure);
             }
         }
 
-        private void Statement()
+        private void Statement(ProcedureRecord procedure)
         {
             //Statement -> AssignStat | IOStat
             if (Peek(Tokens.idt))
             {
-                AssignStat();
+                AssignStat(procedure);
             }
             else
                 IOStat();
@@ -478,13 +462,15 @@ namespace OberonCompiler
             if (PeekOrMatch(Tokens.writet))
             {
                 Match(Tokens.lparent);
-                Write_List();
+                var writelist = Write_List();
+                e.EmitWriteStatement(writelist);
                 Match(Tokens.rparent);
             }
             else if (PeekOrMatch(Tokens.writelnt))
             {
                 Match(Tokens.lparent);
-                Write_List();
+                var writelist = Write_List();
+                e.EmitWriteLnStatement(writelist);
                 Match(Tokens.rparent);
             }
             else Match(Tokens.writet, Tokens.writelnt); //this will fail
@@ -516,62 +502,67 @@ namespace OberonCompiler
         {
             //Write_Token -> idt | numt | literal
             Match(Tokens.idt, Tokens.numt, Tokens.stringt);
+            if (ct.type == Tokens.stringt)
+            {
+                var s = symTable.Insert(ct.lexeme, ct, 0); //Strings are always base depth
+                s.stringRecord = new StringLiteral(ct.lexeme);
+            }
             return ct;
         }
 
-        private Token Expr() //returns temp var
+        private Token Expr(ProcedureRecord procedure) //returns temp var
         {
             //Expr -> Relation
-            return Relation();
+            return Relation(procedure);
         }
 
-        private Token Relation() // returns temp var
+        private Token Relation(ProcedureRecord procedure) // returns temp var
         {
             //Relation -> SimpleExpr
-            return SimpleExpr();
+            return SimpleExpr(procedure);
         }
 
-        private Token SimpleExpr() // returns temp var
+        private Token SimpleExpr(ProcedureRecord procedure) // returns temp var
         {
             //SimpleExpr -> Term MoreTerm
-            var l = Term();
-            return MoreTerm(l);
+            var l = Term(procedure);
+            return MoreTerm(l, procedure);
         }
 
-        private Token MoreTerm(Token synth)
+        private Token MoreTerm(Token synth, ProcedureRecord procedure)
         {
             //MoreTerm -> Addop Term MoreTerm | e
             if (Peek(Tokens.addopt, Tokens.minust))
             {
                 var op = Addop();
-                var l = Term();
-                var r = MoreTerm(l);
-                return e.EmitExpression(synth, op, r, depth);
+                var l = Term(procedure);
+                var r = MoreTerm(l, procedure);
+                return e.EmitExpression(synth, op, r, depth, procedure);
             }
             return synth;
         }
 
-        private Token Term()
+        private Token Term(ProcedureRecord procedure)
         {
             //Term -> Factor MoreFactor
-            var l = Factor();
-            return MoreFactor(l);
+            var l = Factor(procedure);
+            return MoreFactor(l, procedure);
         }
 
-        private Token MoreFactor(Token synth)
+        private Token MoreFactor(Token synth, ProcedureRecord procedure)
         {
             //MoreFactor -> Mulop Factor MoreFactor | e
             if (Peek(Tokens.mulopt))
             {
                 var op = Mulop();
-                var l = Factor();
-                var r = MoreFactor(l);
-                return e.EmitExpression(synth, op, r, depth); // throw away L because it got synthed into R anyway
+                var l = Factor(procedure);
+                var r = MoreFactor(l, procedure);
+                return e.EmitExpression(synth, op, r, depth, procedure); // throw away L because it got synthed into R anyway
             }
             return synth;
         }
 
-        private Token Factor() //returns the THING
+        private Token Factor(ProcedureRecord procedure) //returns the THING
         {
             //Factor -> idt | numt | ( Expr ) | ~ Factor | SignOp Factor
             switch (nt.type)
@@ -584,16 +575,16 @@ namespace OberonCompiler
                     return ct;
                 case Tokens.lparent:
                     Match(Tokens.lparent);
-                    var tempVar = Expr();
+                    var tempVar = Expr(procedure);
                     Match(Tokens.rparent);
                     return tempVar;
                 case Tokens.tildet:
                     Match(Tokens.tildet);
-                    return Factor();
+                    return Factor(procedure);
                 case Tokens.minust:
                     SignOp();
-                    var factor = Factor();
-                    return e.EmitNegation(factor, depth);
+                    var factor = Factor(procedure);
+                    return e.EmitNegation(factor, depth, procedure);
                 default:
                     Match(Tokens.idt, Tokens.numt, Tokens.lparent, Tokens.tildet, Tokens.minust);
                     return TokenFactory.createEmptyToken();
@@ -622,7 +613,7 @@ namespace OberonCompiler
             Match(Tokens.minust);
         }
 
-        private void AssignStat()
+        private void AssignStat(ProcedureRecord procedure)
         {
             //AssignStat -> idt := Expr | ProcCall
 
@@ -642,8 +633,8 @@ namespace OberonCompiler
                 }
                 var l = ct;
                 Match(Tokens.assignopt);
-                var expr = Expr();
-                var buffer = e.EmitBuffer(expr, depth);
+                var expr = Expr(procedure);
+                var buffer = e.EmitBuffer(expr, depth, procedure);
                 e.EmitAssignment(l, buffer);
             }
             else Match(Tokens.lparent, Tokens.assignopt);

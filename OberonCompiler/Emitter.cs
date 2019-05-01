@@ -54,11 +54,18 @@ namespace OberonCompiler
             foreach (Token token in writeList) EmitWrite(token);
         }
 
+        public void EmitWriteLnStatement(List<Token> writeList)
+        {
+            EmitWriteStatement(writeList);
+            EmitLine("wrln");
+        }
+
         private void EmitWrite(Token token)
         {
             if (token.type == Tokens.idt)
             {
-
+                // int
+                EmitLine("wri {0}", getVariableTokenValue(token));
             }
             else if (token.type == Tokens.numt)
             {
@@ -66,12 +73,8 @@ namespace OberonCompiler
             }
             else if (token.type == Tokens.stringt)
             {
-                foreach (char c in token.lexeme)
-                {
-                    EmitLine("wrs {0}", c.ToString());
-                }
-
-                EmitLine("wrln");
+                var sr = symTable.Lookup(token.lexeme);
+                EmitLine("wrs {0}", sr.stringRecord.referenceValue);
             }
             else Error.Crash("ERROR IN Emitter.EmitWrite(): unwritable token passed to write procedure");
         }
@@ -130,9 +133,9 @@ namespace OberonCompiler
             EmitLine("call {0}", procedureToken.lexeme);
         }
 
-        public Token EmitExpression(Token left, Token op, Token right, int depth)
+        public Token EmitExpression(Token left, Token op, Token right, int depth, ProcedureRecord procedure)
         {
-            var record = getTempVarToken(depth);
+            var record = getTempVarToken(depth, procedure);
 
             EmitLine("{0} {1} {2} {3} {4}", 
                 record.varRecord.getTACString(), 
@@ -143,7 +146,7 @@ namespace OberonCompiler
             return new Token(Tokens.idt, -1, record.symbol.lexeme);
         }
 
-        private Record getTempVarToken(int depth)
+        private Record getTempVarToken(int depth, ProcedureRecord procedure)
         {
             //So here we're looking to turn an expression into a temporary variable
             string tempVarLex = "_t" + temporaryVariableCounter++.ToString();
@@ -151,13 +154,17 @@ namespace OberonCompiler
             Token tempVar = new Token(Tokens.idt, -1, tempVarLex);
             var record = symTable.Insert(tempVarLex, tempVar, depth);
             record.varRecord = new VariableRecord(tempVar, VarTypes.intType, symTable.offset, 2, depth, false, false);
+
+            if (procedure != null)
+                procedure.AddLocal(record.varRecord);
+
             symTable.incrementOffset(2);
             return record;
         }
 
-        public Token EmitBuffer(Token bufferedVariable, int depth)
+        public Token EmitBuffer(Token bufferedVariable, int depth, ProcedureRecord procedure)
         {
-            var token = getTempVarToken(depth).symbol;
+            var token = getTempVarToken(depth, procedure).symbol;
             EmitAssignment(token, bufferedVariable);
             return token;
         }
@@ -167,22 +174,32 @@ namespace OberonCompiler
             EmitLine("{0}\t=\t{1}", getValueString(left), getValueString(right));
         }
 
-        public Token EmitNegation(Token t, int depth)
+        public Token EmitNegation(Token t, int depth, ProcedureRecord procedure)
         {
             //My expression: 0 - t
             return EmitExpression(
                 new Token(Tokens.numt, -1, "0", 0, 0),
                 new Token(Tokens.minust, -1, "-"),
                 t,
-                depth);
+                depth,
+                procedure);
         }
 
         private string getValueString(Token token)
         {
             if (token.type == Tokens.idt)
-                return getVariableTokenValue(token);
-            else if (token.type == Tokens.constt)
-                return getConstTokenValue(token);
+            {
+                var vr = symTable.Lookup(token.lexeme);
+                if (vr == null)
+                    Error.Crash("Error on line {0}: Use of undeclared identifier {1}", token.lineNumber, token.lexeme);
+                if (vr.type == RecordTypes.CONSTANT)
+                    return getConstTokenValue(token);
+                else if (vr.type == RecordTypes.VARIABLE)
+                    return getVariableTokenValue(token);
+                else Error.Crash("Error on line {0}: Use of invalid identifier {1} in expression", token.lineNumber, token.lexeme);
+            }
+                
+                
             else if (token.type == Tokens.numt)
                 return getLiteralTokenValue(token);
 

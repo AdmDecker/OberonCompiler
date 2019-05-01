@@ -17,6 +17,24 @@ namespace OberonCompiler
         charType,
         intType,
         floatType,
+        stringType
+    }
+
+    public class StringLiteral : IDataObject
+    {
+        private static int numberOfStrings = 0;
+        public StringLiteral(string value)
+        {
+            this.value = value;
+            this.referenceValue = "_S" + numberOfStrings++.ToString();
+        }
+
+        public string referenceValue;
+        public string value;
+        public VarTypes type = VarTypes.stringType;
+
+        public VarTypes getType() => type;
+        public string getTACString() => value;
     }
 
     public class LiteralValue : IDataObject
